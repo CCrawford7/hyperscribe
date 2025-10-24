@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quick Notepad</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Roboto:wght@400;700&family=Merriweather:wght@400;700&family=Space+Mono:wght@400;700&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div id="app" class="theme-light">
+    <header id="toolbar" class="toolbar toolbar-expanded" aria-label="Quick Notepad toolbar">
+      <button id="copyButton" class="toolbar-btn" data-icon="📋" type="button">
+        <span class="icon">📋</span>
+        <span class="label">Copy All</span>
+      </button>
+      <button id="darkModeButton" class="toolbar-btn" data-icon="🌗" type="button">
+        <span class="icon">🌗</span>
+        <span class="label">Dark Mode</span>
+      </button>
+      <button id="fontButton" class="toolbar-btn" data-icon="🔠" type="button" aria-expanded="false" aria-controls="fontPanel">
+        <span class="icon">🔠</span>
+        <span class="label">Font Settings</span>
+      </button>
+      <button id="hyperlinkButton" class="toolbar-btn" data-icon="🔗" type="button" aria-pressed="false">
+        <span class="icon">🔗</span>
+        <span class="label">Hyperlinks</span>
+      </button>
+      <button id="emojiButton" class="toolbar-btn" data-icon="😊" type="button" aria-expanded="false" aria-controls="emojiPanel">
+        <span class="icon">😊</span>
+        <span class="label">Emoji Picker</span>
+      </button>
+      <button id="downloadButton" class="toolbar-btn" data-icon="💾" type="button">
+        <span class="icon">💾</span>
+        <span class="label">Download Note</span>
+      </button>
+      <button id="compactButton" class="toolbar-btn" data-icon="🗜️" type="button" aria-pressed="false">
+        <span class="icon">🗜️</span>
+        <span class="label">Compact Mode</span>
+      </button>
+    </header>
+
+    <section id="fontPanel" class="panel hidden" aria-label="Font settings">
+      <div class="panel-row">
+        <label for="fontSizeControl">Font Size</label>
+        <input id="fontSizeControl" type="range" min="12" max="32" step="1">
+        <span id="fontSizeValue" class="value-tag">16px</span>
+      </div>
+      <div class="panel-row">
+        <label for="fontFamilySelect">Font Family</label>
+        <select id="fontFamilySelect">
+          <option value="Inter, sans-serif">Inter</option>
+          <option value="Roboto, sans-serif">Roboto</option>
+          <option value="Merriweather, serif">Merriweather</option>
+          <option value="Space Mono, monospace">Space Mono</option>
+          <option value="Fira Code, monospace">Fira Code</option>
+          <option value="Georgia, serif">Georgia</option>
+        </select>
+      </div>
+      <div class="panel-row toggles">
+        <button id="boldToggle" type="button" class="toggle-btn" aria-pressed="false">Bold</button>
+        <button id="italicToggle" type="button" class="toggle-btn" aria-pressed="false">Italic</button>
+      </div>
+    </section>
+
+    <section id="emojiPanel" class="panel hidden" aria-label="Emoji picker">
+      <div id="emojiGrid" class="emoji-grid" role="grid" aria-live="polite"></div>
+    </section>
+
+    <div class="note-container">
+      <textarea id="noteArea" placeholder="Type your note..." aria-label="Note text area" autofocus></textarea>
+      <div id="linkOverlay" class="link-overlay" aria-hidden="true"></div>
+    </div>
+
+    <div id="colorPickerPanel" class="color-picker hidden" role="dialog" aria-label="Color picker" aria-modal="false">
+      <header class="color-picker-header">
+        <span>Background Color</span>
+        <button id="closeColorPicker" type="button" class="icon-btn" aria-label="Close color picker">✕</button>
+      </header>
+      <div class="picker-row">
+        <label for="hueControl">Hue</label>
+        <input id="hueControl" type="range" min="0" max="360" step="1">
+      </div>
+      <div class="picker-row">
+        <label for="saturationControl">Saturation</label>
+        <input id="saturationControl" type="range" min="0" max="100" step="1">
+      </div>
+      <div class="picker-row">
+        <label for="lightnessControl">Lightness</label>
+        <input id="lightnessControl" type="range" min="0" max="100" step="1">
+      </div>
+      <div class="picker-footer">
+        <span id="currentHex" class="value-tag">#ffffff</span>
+      </div>
+    </div>
+
+    <nav id="radialMenu" class="radial-menu hidden" role="menu" aria-label="Radial shortcuts">
+      <button class="radial-item" data-action="copy-all" type="button" role="menuitem">Copy</button>
+      <button class="radial-item" data-action="cut-all" type="button" role="menuitem">Cut</button>
+      <button class="radial-item" data-action="download" type="button" role="menuitem">Save</button>
+      <button class="radial-item" data-action="color" type="button" role="menuitem">Color</button>
+    </nav>
+  </div>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

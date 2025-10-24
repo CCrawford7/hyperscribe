@@ -1,0 +1,399 @@
+import RadialMenu from './modules/radialMenu.js';
+import ColorPicker from './modules/colorPicker.js';
+import { downloadAsText } from './modules/downloadHelper.js';
+import FontManager from './modules/fontManager.js';
+
+const storageKey = 'quickNotepadState';
+
+const elements = {
+  app: document.getElementById('app'),
+  toolbar: document.getElementById('toolbar'),
+  copyButton: document.getElementById('copyButton'),
+  darkModeButton: document.getElementById('darkModeButton'),
+  fontButton: document.getElementById('fontButton'),
+  hyperlinkButton: document.getElementById('hyperlinkButton'),
+  emojiButton: document.getElementById('emojiButton'),
+  downloadButton: document.getElementById('downloadButton'),
+  compactButton: document.getElementById('compactButton'),
+  fontPanel: document.getElementById('fontPanel'),
+  fontSizeControl: document.getElementById('fontSizeControl'),
+  fontSizeValue: document.getElementById('fontSizeValue'),
+  fontFamilySelect: document.getElementById('fontFamilySelect'),
+  boldToggle: document.getElementById('boldToggle'),
+  italicToggle: document.getElementById('italicToggle'),
+  emojiPanel: document.getElementById('emojiPanel'),
+  emojiGrid: document.getElementById('emojiGrid'),
+  noteArea: document.getElementById('noteArea'),
+  linkOverlay: document.getElementById('linkOverlay'),
+  radialMenu: document.getElementById('radialMenu'),
+  colorPickerPanel: document.getElementById('colorPickerPanel'),
+  hueControl: document.getElementById('hueControl'),
+  saturationControl: document.getElementById('saturationControl'),
+  lightnessControl: document.getElementById('lightnessControl'),
+  currentHex: document.getElementById('currentHex'),
+  closeColorPicker: document.getElementById('closeColorPicker')
+};
+
+const emojiList = [
+  '😀', '😁', '😂', '🤣', '😊', '😍', '🤓', '😎', '🤩', '🥳',
+  '😌', '🤔', '😴', '😇', '🙌', '👏', '👍', '🔥', '✨', '🌈',
+  '📌', '📝', '✅', '⚡', '💡', '📎', '🔖', '📚', '⏰', '🎯',
+  '🧠', '💭', '🛠️', '🎶', '🍀', '🌟', '🚀', '🧭', '📍', '💬'
+];
+
+const defaultState = {
+  note: '',
+  darkMode: false,
+  compactMode: false,
+  hyperlinks: false,
+  font: {
+    size: 16,
+    family: 'Inter, sans-serif',
+    weight: 'normal',
+    style: 'normal'
+  },
+  backgroundColor: {
+    h: 225,
+    s: 70,
+    l: 96,
+    hex: '#eff3ff'
+  }
+};
+
+let state = structuredClone(defaultState);
+let saveTimer = null;
+
+const fontManager = new FontManager({
+  noteArea: elements.noteArea,
+  overlay: elements.linkOverlay,
+  controls: {
+    size: elements.fontSizeControl,
+    sizeIndicator: elements.fontSizeValue,
+    family: elements.fontFamilySelect,
+    bold: elements.boldToggle,
+    italic: elements.italicToggle
+  },
+  onChange: handleFontChange
+});
+
+const colorPicker = new ColorPicker({
+  panel: elements.colorPickerPanel,
+  controls: {
+    hue: elements.hueControl,
+    saturation: elements.saturationControl,
+    lightness: elements.lightnessControl,
+    hexLabel: elements.currentHex,
+    closeButton: elements.closeColorPicker
+  },
+  onChange: handleColorChange,
+  onClose: () => {
+    elements.noteArea.focus();
+  }
+});
+
+const radialMenu = new RadialMenu({
+  trigger: elements.noteArea,
+  menu: elements.radialMenu,
+  onAction: handleRadialAction
+});
+
+init();
+
+async function init() {
+  renderEmojiButtons();
+  bindEvents();
+  await hydrateState();
+  elements.noteArea.addEventListener('scroll', syncOverlayScroll);
+  syncOverlayScroll();
+}
+
+function renderEmojiButtons() {
+  const fragment = document.createDocumentFragment();
+  emojiList.forEach((emoji, index) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'emoji-btn';
+    button.textContent = emoji;
+    button.setAttribute('aria-label', `Insert emoji ${emoji}`);
+    button.setAttribute('role', 'gridcell');
+    button.dataset.index = String(index);
+    button.addEventListener('click', () => insertEmoji(emoji));
+    fragment.appendChild(button);
+  });
+  elements.emojiGrid.textContent = '';
+  elements.emojiGrid.appendChild(fragment);
+}
+
+async function hydrateState() {
+  try {
+    const stored = await chrome.storage.local.get(storageKey);
+    state = {
+      ...structuredClone(defaultState),
+      ...(stored?.[storageKey] ?? {})
+    };
+  } catch (error) {
+    console.warn('Quick Notepad: unable to load previous state', error);
+    state = structuredClone(defaultState);
+  }
+
+  applyStateToUI();
+}
+
+function applyStateToUI() {
+  elements.noteArea.value = state.note;
+  toggleHyperlinks(state.hyperlinks, { skipSave: true });
+
+  elements.compactButton.setAttribute('aria-pressed', String(state.compactMode));
+  setCompactMode(state.compactMode, { skipSave: true });
+
+  setDarkMode(state.darkMode, { skipSave: true });
+
+  fontManager.apply(state.font);
+
+  colorPicker.apply(state.backgroundColor);
+  applyBackgroundColor(state.backgroundColor);
+}
+
+function bindEvents() {
+  elements.copyButton.addEventListener('click', copyAll);
+  elements.darkModeButton.addEventListener('click', () => toggleDarkMode());
+  elements.fontButton.addEventListener('click', toggleFontPanel);
+  elements.hyperlinkButton.addEventListener('click', () => toggleHyperlinks());
+  elements.emojiButton.addEventListener('click', toggleEmojiPanel);
+  elements.downloadButton.addEventListener('click', downloadNote);
+  elements.compactButton.addEventListener('click', () => setCompactMode(!state.compactMode));
+  elements.noteArea.addEventListener('input', handleNoteChange);
+  document.addEventListener('click', handleDocumentClick);
+  document.addEventListener('keydown', handleKeyDown);
+}
+
+function handleFontChange(fontState) {
+  state.font = fontState;
+  scheduleSave({ font: state.font });
+}
+
+function handleColorChange(colorState) {
+  state.backgroundColor = colorState;
+  applyBackgroundColor(colorState);
+  scheduleSave({ backgroundColor: state.backgroundColor });
+}
+
+function handleRadialAction(action) {
+  switch (action) {
+    case 'copy-all':
+      copyAll();
+      break;
+    case 'cut-all':
+      cutAll();
+      break;
+    case 'download':
+      downloadNote();
+      break;
+    case 'color':
+      colorPicker.toggle({ anchor: radialMenu.getPosition() });
+      break;
+    default:
+      break;
+  }
+}
+
+function handleNoteChange(event) {
+  state.note = event.target.value;
+  scheduleSave({ note: state.note });
+  if (state.hyperlinks) {
+    updateLinkOverlay(state.note);
+  }
+}
+
+function scheduleSave(partial) {
+  state = { ...state, ...partial };
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+  }
+  saveTimer = setTimeout(async () => {
+    try {
+      await chrome.storage.local.set({ [storageKey]: state });
+    } catch (error) {
+      console.warn('Quick Notepad: failed to save state', error);
+    }
+  }, 200);
+}
+
+async function copyAll() {
+  const text = elements.noteArea.value;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      elements.noteArea.select();
+      document.execCommand('copy');
+    }
+  } catch (error) {
+    console.warn('Quick Notepad: copy failed', error);
+  }
+}
+
+async function cutAll() {
+  await copyAll();
+  elements.noteArea.value = '';
+  state.note = '';
+  scheduleSave({ note: state.note });
+  updateLinkOverlay('');
+}
+
+function downloadNote() {
+  const timestamp = new Date().toISOString().replace(/[:T]/g, '-').split('.')[0];
+  const filename = `quick-note-${timestamp}.txt`;
+  downloadAsText(filename, elements.noteArea.value).catch(error => {
+    console.warn('Quick Notepad: download failed', error);
+  });
+}
+
+function toggleDarkMode(forceState) {
+  const next = typeof forceState === 'boolean' ? forceState : !state.darkMode;
+  setDarkMode(next);
+}
+
+function setDarkMode(isDark, options = {}) {
+  state.darkMode = isDark;
+  elements.app.classList.toggle('theme-dark', isDark);
+  elements.app.classList.toggle('theme-light', !isDark);
+  if (!options.skipSave) {
+    scheduleSave({ darkMode: state.darkMode });
+  }
+}
+
+function toggleFontPanel() {
+  const isExpanded = elements.fontButton.getAttribute('aria-expanded') === 'true';
+  const next = !isExpanded;
+  elements.fontButton.setAttribute('aria-expanded', String(next));
+  elements.fontPanel.classList.toggle('hidden', !next);
+  if (next) {
+    elements.emojiPanel.classList.add('hidden');
+    elements.emojiButton.setAttribute('aria-expanded', 'false');
+  }
+}
+
+function toggleEmojiPanel() {
+  const isExpanded = elements.emojiButton.getAttribute('aria-expanded') === 'true';
+  const next = !isExpanded;
+  elements.emojiButton.setAttribute('aria-expanded', String(next));
+  elements.emojiPanel.classList.toggle('hidden', !next);
+  if (next) {
+    elements.fontPanel.classList.add('hidden');
+    elements.fontButton.setAttribute('aria-expanded', 'false');
+  }
+}
+
+function toggleHyperlinks(forceState, options = {}) {
+  const next = typeof forceState === 'boolean' ? forceState : !state.hyperlinks;
+  state.hyperlinks = next;
+  elements.hyperlinkButton.setAttribute('aria-pressed', String(next));
+  if (next) {
+    updateLinkOverlay(state.note);
+  } else {
+    elements.linkOverlay.classList.remove('active');
+    elements.linkOverlay.innerHTML = '';
+  }
+  if (!options.skipSave) {
+    scheduleSave({ hyperlinks: state.hyperlinks });
+  }
+}
+
+function setCompactMode(forceState, options = {}) {
+  const next = typeof forceState === 'boolean' ? forceState : !state.compactMode;
+  state.compactMode = next;
+  elements.toolbar.classList.toggle('toolbar-compact', next);
+  elements.compactButton.setAttribute('aria-pressed', String(next));
+  if (!options.skipSave) {
+    scheduleSave({ compactMode: state.compactMode });
+  }
+}
+
+function insertEmoji(emoji) {
+  const { selectionStart, selectionEnd, value } = elements.noteArea;
+  const before = value.slice(0, selectionStart);
+  const after = value.slice(selectionEnd);
+  const nextValue = `${before}${emoji}${after}`;
+  elements.noteArea.value = nextValue;
+  const nextCursor = before.length + emoji.length;
+  elements.noteArea.focus();
+  elements.noteArea.setSelectionRange(nextCursor, nextCursor);
+  handleNoteChange({ target: elements.noteArea });
+}
+
+function updateLinkOverlay(text) {
+  if (!state.hyperlinks) {
+    return;
+  }
+  if (!text.trim()) {
+    elements.linkOverlay.innerHTML = '';
+    elements.linkOverlay.classList.remove('active');
+    return;
+  }
+  const escaped = escapeHTML(text);
+  const linked = escaped.replace(urlRegex, match => {
+    const href = match.startsWith('http') ? match : `https://${match}`;
+    return `<a href=\"${href}\" target=\"_blank\" rel=\"noopener noreferrer\">${match}</a>`;
+  });
+  elements.linkOverlay.innerHTML = linked;
+  elements.linkOverlay.classList.add('active');
+  syncOverlayScroll();
+}
+
+const urlRegex = /\b((?:https?:\/\/)|(?:www\.))[^\s<]+/gi;
+
+function escapeHTML(value) {
+  const map = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  };
+  return value.replace(/[&<>"']/g, char => map[char]);
+}
+
+function syncOverlayScroll() {
+  elements.linkOverlay.scrollTop = elements.noteArea.scrollTop;
+  elements.linkOverlay.scrollLeft = elements.noteArea.scrollLeft;
+}
+
+function handleDocumentClick(event) {
+  if (!elements.fontPanel.classList.contains('hidden') && !elements.fontPanel.contains(event.target) && event.target !== elements.fontButton) {
+    elements.fontPanel.classList.add('hidden');
+    elements.fontButton.setAttribute('aria-expanded', 'false');
+  }
+  if (!elements.emojiPanel.classList.contains('hidden') && !elements.emojiPanel.contains(event.target) && event.target !== elements.emojiButton) {
+    elements.emojiPanel.classList.add('hidden');
+    elements.emojiButton.setAttribute('aria-expanded', 'false');
+  }
+  if (
+    !elements.colorPickerPanel.classList.contains('hidden') &&
+    !elements.colorPickerPanel.contains(event.target) &&
+    !elements.radialMenu.contains(event.target)
+  ) {
+    colorPicker.hide();
+  }
+}
+
+function handleKeyDown(event) {
+  if (event.key === 'Escape') {
+    if (!elements.fontPanel.classList.contains('hidden')) {
+      elements.fontPanel.classList.add('hidden');
+      elements.fontButton.setAttribute('aria-expanded', 'false');
+    }
+    if (!elements.emojiPanel.classList.contains('hidden')) {
+      elements.emojiPanel.classList.add('hidden');
+      elements.emojiButton.setAttribute('aria-expanded', 'false');
+    }
+    colorPicker.hide();
+  }
+}
+
+function applyBackgroundColor(color) {
+  const hsl = `hsl(${color.h} ${color.s}% ${color.l}%)`;
+  elements.noteArea.style.backgroundColor = hsl;
+  elements.linkOverlay.style.backgroundColor = hsl;
+  elements.currentHex.textContent = color.hex;
+}
