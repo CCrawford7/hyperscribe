@@ -33,7 +33,7 @@
 
 body {
   margin: 0;
-  width: 300px;
+  width: 360px;
   height: 420px;
   font-family: var(--font-family);
   font-size: 14px;
@@ -68,6 +68,7 @@ body.body-dark {
 .toolbar {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 6px;
   padding: 8px;
   border: 1px solid var(--light-border);
