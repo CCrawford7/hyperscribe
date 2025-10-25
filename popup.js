@@ -34,7 +34,11 @@ const elements = {
   currentHex: document.getElementById('currentHex'),
   closeColorPicker: document.getElementById('closeColorPicker'),
   storageUsage: document.getElementById('storageUsage'),
-  clearStorageButton: document.getElementById('clearStorageButton')
+  clearStorageButton: document.getElementById('clearStorageButton'),
+  confirmOverlay: document.getElementById('confirmOverlay'),
+  confirmMessage: document.getElementById('confirmMessage'),
+  confirmAcceptButton: document.getElementById('confirmAcceptButton'),
+  confirmCancelButton: document.getElementById('confirmCancelButton')
 };
 
 const emojiList = [
@@ -65,11 +69,13 @@ const defaultState = {
 
 let state = structuredClone(defaultState);
 let saveTimer = null;
+let pendingConfirmation = null;
+let confirmationRestoreTarget = null;
 
-const NOTE_TEXT_LIGHT = '#1c2031';
-const NOTE_TEXT_DARK = '#f2f4ff';
-const NOTE_SELECTION_LIGHT = 'rgba(76, 110, 245, 0.25)';
-const NOTE_SELECTION_DARK = 'rgba(145, 164, 255, 0.45)';
+const NOTE_TEXT_LIGHT = '#09121d';
+const NOTE_TEXT_DARK = '#33ff80';
+const NOTE_SELECTION_LIGHT = 'rgba(12, 30, 54, 0.3)';
+const NOTE_SELECTION_DARK = 'rgba(51, 255, 128, 0.45)';
 
 const fontManager = new FontManager({
   noteArea: elements.noteArea,
@@ -174,6 +180,9 @@ function bindEvents() {
   elements.compactButton.addEventListener('click', () => setCompactMode(!state.compactMode));
   elements.clearStorageButton.addEventListener('click', clearStoredData);
   elements.noteArea.addEventListener('input', handleNoteChange);
+  elements.confirmAcceptButton?.addEventListener('click', () => resolveConfirmation(true));
+  elements.confirmCancelButton?.addEventListener('click', () => resolveConfirmation(false));
+  elements.confirmOverlay?.addEventListener('click', handleConfirmOverlayClick);
   document.addEventListener('click', handleDocumentClick);
   document.addEventListener('keydown', handleKeyDown);
 }
@@ -249,26 +258,20 @@ async function copyAll() {
 
 async function cutAll() {
   await copyAll();
-  elements.noteArea.value = '';
-  state.note = '';
-  scheduleSave({ note: state.note });
-  updateLinkOverlay('');
-  elements.noteArea.focus();
+  performClearNote();
 }
 
 function clearNote() {
   const hasContent = elements.noteArea.value.trim().length > 0;
   if (hasContent) {
-    const confirmed = window.confirm('Clear the note? This will erase all text.');
-    if (!confirmed) {
-      return;
-    }
+    showConfirmation({
+      message: 'Clear the current note? This action cannot be undone.',
+      confirmLabel: 'Clear Note',
+      onConfirm: performClearNote
+    });
+    return;
   }
-  elements.noteArea.value = '';
-  state.note = '';
-  scheduleSave({ note: state.note });
-  updateLinkOverlay('');
-  elements.noteArea.focus();
+  performClearNote();
 }
 
 function downloadNote() {
@@ -395,6 +398,9 @@ function syncOverlayScroll() {
 }
 
 function handleDocumentClick(event) {
+  if (isConfirmationOpen()) {
+    return;
+  }
   if (!elements.fontPanel.classList.contains('hidden') && !elements.fontPanel.contains(event.target) && event.target !== elements.fontButton) {
     elements.fontPanel.classList.add('hidden');
     elements.fontButton.setAttribute('aria-expanded', 'false');
@@ -413,6 +419,13 @@ function handleDocumentClick(event) {
 }
 
 function handleKeyDown(event) {
+  if (isConfirmationOpen()) {
+    if (event.key === 'Escape') {
+      resolveConfirmation(false);
+      event.preventDefault();
+    }
+    return;
+  }
   if (event.key === 'Escape') {
     if (!elements.fontPanel.classList.contains('hidden')) {
       elements.fontPanel.classList.add('hidden');
@@ -434,25 +447,27 @@ function applyBackgroundColor(color) {
   updateNoteContrast();
 }
 
-async function clearStoredData() {
-  const confirmed = window.confirm('Clear all saved Quick Notepad data? This resets the note and preferences.');
-  if (!confirmed) {
-    return;
-  }
-  if (saveTimer) {
-    clearTimeout(saveTimer);
-    saveTimer = null;
-  }
-  try {
-    await chrome.storage.local.remove(storageKey);
-    state = structuredClone(defaultState);
-    applyStateToUI();
-    await chrome.storage.local.set({ [storageKey]: state });
-  } catch (error) {
-    console.warn('Quick Notepad: failed to reset state', error);
-  } finally {
-    updateStorageUsage();
-  }
+function clearStoredData() {
+  showConfirmation({
+    message: 'Reset all saved Quick Notepad data including note contents and preferences?',
+    confirmLabel: 'Clear Data',
+    onConfirm: async () => {
+      if (saveTimer) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
+      }
+      try {
+        await chrome.storage.local.remove(storageKey);
+        state = structuredClone(defaultState);
+        applyStateToUI();
+        await chrome.storage.local.set({ [storageKey]: state });
+      } catch (error) {
+        console.warn('Quick Notepad: failed to reset state', error);
+      } finally {
+        updateStorageUsage();
+      }
+    }
+  });
 }
 
 function updateNoteContrast() {
@@ -515,4 +530,77 @@ function formatBytes(bytes) {
   }
   const precision = value >= 10 ? 1 : 2;
   return `${value.toFixed(precision)} ${units[unitIndex]}`;
+}
+
+function performClearNote() {
+  elements.noteArea.value = '';
+  state.note = '';
+  scheduleSave({ note: state.note });
+  updateLinkOverlay('');
+  elements.noteArea.focus();
+}
+
+function showConfirmation({ message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', onConfirm }) {
+  if (!elements.confirmOverlay || !elements.confirmMessage || !elements.confirmAcceptButton || !elements.confirmCancelButton) {
+    if (typeof onConfirm === 'function') {
+      onConfirm();
+    }
+    return;
+  }
+
+  if (isConfirmationOpen()) {
+    resolveConfirmation(false);
+  }
+
+  pendingConfirmation = {
+    onConfirm: typeof onConfirm === 'function' ? onConfirm : null
+  };
+  elements.confirmMessage.textContent = message;
+  elements.confirmAcceptButton.textContent = confirmLabel;
+  elements.confirmCancelButton.textContent = cancelLabel;
+  elements.confirmOverlay.classList.remove('hidden');
+  elements.confirmOverlay.setAttribute('aria-hidden', 'false');
+
+  confirmationRestoreTarget = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  requestAnimationFrame(() => {
+    elements.confirmAcceptButton.focus();
+  });
+}
+
+function resolveConfirmation(accepted) {
+  if (!isConfirmationOpen()) {
+    return;
+  }
+  const action = pendingConfirmation?.onConfirm ?? null;
+  pendingConfirmation = null;
+  hideConfirmation();
+  if (accepted && typeof action === 'function') {
+    Promise.resolve()
+      .then(action)
+      .catch(error => {
+        console.warn('Quick Notepad: confirmation action failed', error);
+      });
+  }
+}
+
+function hideConfirmation() {
+  if (!elements.confirmOverlay) {
+    return;
+  }
+  elements.confirmOverlay.classList.add('hidden');
+  elements.confirmOverlay.setAttribute('aria-hidden', 'true');
+  if (confirmationRestoreTarget && typeof confirmationRestoreTarget.focus === 'function') {
+    confirmationRestoreTarget.focus();
+  }
+  confirmationRestoreTarget = null;
+}
+
+function isConfirmationOpen() {
+  return Boolean(elements.confirmOverlay && !elements.confirmOverlay.classList.contains('hidden'));
+}
+
+function handleConfirmOverlayClick(event) {
+  if (event.target === elements.confirmOverlay) {
+    resolveConfirmation(false);
+  }
 }
