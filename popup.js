@@ -9,6 +9,7 @@ const elements = {
   app: document.getElementById('app'),
   toolbar: document.getElementById('toolbar'),
   copyButton: document.getElementById('copyButton'),
+  clearNoteButton: document.getElementById('clearNoteButton'),
   darkModeButton: document.getElementById('darkModeButton'),
   fontButton: document.getElementById('fontButton'),
   hyperlinkButton: document.getElementById('hyperlinkButton'),
@@ -31,7 +32,9 @@ const elements = {
   saturationControl: document.getElementById('saturationControl'),
   lightnessControl: document.getElementById('lightnessControl'),
   currentHex: document.getElementById('currentHex'),
-  closeColorPicker: document.getElementById('closeColorPicker')
+  closeColorPicker: document.getElementById('closeColorPicker'),
+  storageUsage: document.getElementById('storageUsage'),
+  clearStorageButton: document.getElementById('clearStorageButton')
 };
 
 const emojiList = [
@@ -62,6 +65,11 @@ const defaultState = {
 
 let state = structuredClone(defaultState);
 let saveTimer = null;
+
+const NOTE_TEXT_LIGHT = '#1c2031';
+const NOTE_TEXT_DARK = '#f2f4ff';
+const NOTE_SELECTION_LIGHT = 'rgba(76, 110, 245, 0.25)';
+const NOTE_SELECTION_DARK = 'rgba(145, 164, 255, 0.45)';
 
 const fontManager = new FontManager({
   noteArea: elements.noteArea,
@@ -103,6 +111,7 @@ async function init() {
   renderEmojiButtons();
   bindEvents();
   await hydrateState();
+  await updateStorageUsage();
   elements.noteArea.addEventListener('scroll', syncOverlayScroll);
   syncOverlayScroll();
 }
@@ -156,12 +165,14 @@ function applyStateToUI() {
 
 function bindEvents() {
   elements.copyButton.addEventListener('click', copyAll);
+  elements.clearNoteButton.addEventListener('click', clearNote);
   elements.darkModeButton.addEventListener('click', () => toggleDarkMode());
   elements.fontButton.addEventListener('click', toggleFontPanel);
   elements.hyperlinkButton.addEventListener('click', () => toggleHyperlinks());
   elements.emojiButton.addEventListener('click', toggleEmojiPanel);
   elements.downloadButton.addEventListener('click', downloadNote);
   elements.compactButton.addEventListener('click', () => setCompactMode(!state.compactMode));
+  elements.clearStorageButton.addEventListener('click', clearStoredData);
   elements.noteArea.addEventListener('input', handleNoteChange);
   document.addEventListener('click', handleDocumentClick);
   document.addEventListener('keydown', handleKeyDown);
@@ -213,8 +224,11 @@ function scheduleSave(partial) {
   saveTimer = setTimeout(async () => {
     try {
       await chrome.storage.local.set({ [storageKey]: state });
+      await updateStorageUsage();
     } catch (error) {
       console.warn('Quick Notepad: failed to save state', error);
+    } finally {
+      saveTimer = null;
     }
   }, 200);
 }
@@ -239,6 +253,22 @@ async function cutAll() {
   state.note = '';
   scheduleSave({ note: state.note });
   updateLinkOverlay('');
+  elements.noteArea.focus();
+}
+
+function clearNote() {
+  const hasContent = elements.noteArea.value.trim().length > 0;
+  if (hasContent) {
+    const confirmed = window.confirm('Clear the note? This will erase all text.');
+    if (!confirmed) {
+      return;
+    }
+  }
+  elements.noteArea.value = '';
+  state.note = '';
+  scheduleSave({ note: state.note });
+  updateLinkOverlay('');
+  elements.noteArea.focus();
 }
 
 function downloadNote() {
@@ -258,6 +288,11 @@ function setDarkMode(isDark, options = {}) {
   state.darkMode = isDark;
   elements.app.classList.toggle('theme-dark', isDark);
   elements.app.classList.toggle('theme-light', !isDark);
+  document.body.classList.toggle('body-dark', isDark);
+  if (elements.darkModeButton) {
+    elements.darkModeButton.setAttribute('aria-pressed', String(isDark));
+  }
+  updateNoteContrast();
   if (!options.skipSave) {
     scheduleSave({ darkMode: state.darkMode });
   }
@@ -396,4 +431,88 @@ function applyBackgroundColor(color) {
   elements.noteArea.style.backgroundColor = hsl;
   elements.linkOverlay.style.backgroundColor = hsl;
   elements.currentHex.textContent = color.hex;
+  updateNoteContrast();
+}
+
+async function clearStoredData() {
+  const confirmed = window.confirm('Clear all saved Quick Notepad data? This resets the note and preferences.');
+  if (!confirmed) {
+    return;
+  }
+  if (saveTimer) {
+    clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  try {
+    await chrome.storage.local.remove(storageKey);
+    state = structuredClone(defaultState);
+    applyStateToUI();
+    await chrome.storage.local.set({ [storageKey]: state });
+  } catch (error) {
+    console.warn('Quick Notepad: failed to reset state', error);
+  } finally {
+    updateStorageUsage();
+  }
+}
+
+function updateNoteContrast() {
+  if (!elements.noteArea || !elements.linkOverlay) {
+    return;
+  }
+  const lightness = Number(state.backgroundColor?.l);
+  const isDarkBackground = Number.isFinite(lightness) ? lightness < 55 : state.darkMode;
+  const textColor = isDarkBackground ? NOTE_TEXT_DARK : NOTE_TEXT_LIGHT;
+  const selectionBg = isDarkBackground ? NOTE_SELECTION_DARK : NOTE_SELECTION_LIGHT;
+
+  elements.noteArea.style.setProperty('--note-text-color', textColor);
+  elements.noteArea.style.setProperty('--note-text-highlight', textColor);
+  elements.noteArea.style.setProperty('--note-selection-bg', selectionBg);
+  elements.noteArea.style.color = textColor;
+  elements.noteArea.style.caretColor = textColor;
+
+  elements.linkOverlay.style.setProperty('--note-text-color', textColor);
+  elements.linkOverlay.style.color = textColor;
+}
+
+async function updateStorageUsage() {
+  if (!elements.storageUsage) {
+    return;
+  }
+  try {
+    const bytes = await getBytesInUse();
+    elements.storageUsage.textContent = `Storage: ${formatBytes(bytes)}`;
+  } catch (error) {
+    console.warn('Quick Notepad: unable to read storage usage', error);
+    elements.storageUsage.textContent = 'Storage: n/a';
+  }
+}
+
+function getBytesInUse() {
+  return new Promise((resolve, reject) => {
+    chrome.storage.local.getBytesInUse(storageKey, bytes => {
+      if (chrome.runtime.lastError) {
+        reject(chrome.runtime.lastError);
+        return;
+      }
+      resolve(typeof bytes === 'number' ? bytes : 0);
+    });
+  });
+}
+
+function formatBytes(bytes) {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return '0 B';
+  }
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  if (unitIndex === 0) {
+    return `${Math.round(value)} ${units[unitIndex]}`;
+  }
+  const precision = value >= 10 ? 1 : 2;
+  return `${value.toFixed(precision)} ${units[unitIndex]}`;
 }

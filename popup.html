@@ -16,6 +16,10 @@
         <span class="icon">📋</span>
         <span class="label">Copy All</span>
       </button>
+      <button id="clearNoteButton" class="toolbar-btn" data-icon="🧹" type="button">
+        <span class="icon">🧹</span>
+        <span class="label">Clear Note</span>
+      </button>
       <button id="darkModeButton" class="toolbar-btn" data-icon="🌗" type="button">
         <span class="icon">🌗</span>
         <span class="label">Dark Mode</span>
@@ -97,11 +101,16 @@
     </div>
 
     <nav id="radialMenu" class="radial-menu hidden" role="menu" aria-label="Radial shortcuts">
-      <button class="radial-item" data-action="copy-all" type="button" role="menuitem">Copy</button>
-      <button class="radial-item" data-action="cut-all" type="button" role="menuitem">Cut</button>
-      <button class="radial-item" data-action="download" type="button" role="menuitem">Save</button>
-      <button class="radial-item" data-action="color" type="button" role="menuitem">Color</button>
+      <button class="radial-item" data-action="copy-all" type="button" role="menuitem" aria-label="Copy note">📋</button>
+      <button class="radial-item" data-action="cut-all" type="button" role="menuitem" aria-label="Cut note">✂️</button>
+      <button class="radial-item" data-action="download" type="button" role="menuitem" aria-label="Download note">💾</button>
+      <button class="radial-item" data-action="color" type="button" role="menuitem" aria-label="Pick background color">🎨</button>
     </nav>
+
+    <footer class="status-bar">
+      <span id="storageUsage" class="storage-usage" aria-live="polite">Storage: --</span>
+      <button id="clearStorageButton" type="button" class="status-btn">Clear Saved Data</button>
+    </footer>
   </div>
 
   <script type="module" src="popup.js"></script>
