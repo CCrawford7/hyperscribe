@@ -6,6 +6,7 @@
   <title>Quick Notepad</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://microsoft.github.io/vscode-codicons/dist/codicon.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Roboto:wght@400;700&family=Merriweather:wght@400;700&family=Space+Mono:wght@400;700&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="popup.css">
 </head>
@@ -13,27 +14,35 @@
   <div id="app" class="theme-light">
     <header id="toolbar" class="toolbar toolbar-expanded" aria-label="Quick Notepad toolbar">
       <button id="copyButton" class="toolbar-btn" type="button" data-short="CPY" data-tooltip="Copy note" aria-label="Copy note">
+        <i class="codicon codicon-copy" aria-hidden="true"></i>
         <span class="label">Copy</span>
       </button>
       <button id="clearNoteButton" class="toolbar-btn" type="button" data-short="CLR" data-tooltip="Clear note text" aria-label="Clear note text">
+        <i class="codicon codicon-clear-all" aria-hidden="true"></i>
         <span class="label">Clear</span>
       </button>
       <button id="darkModeButton" class="toolbar-btn" type="button" data-short="DARK" data-tooltip="Toggle terminal mode" aria-label="Toggle terminal mode">
+        <i class="codicon codicon-symbol-color" aria-hidden="true"></i>
         <span class="label">Mode</span>
       </button>
       <button id="fontButton" class="toolbar-btn" type="button" data-short="FONT" data-tooltip="Font controls" aria-expanded="false" aria-controls="fontPanel">
+        <i class="codicon codicon-text-size" aria-hidden="true"></i>
         <span class="label">Fonts</span>
       </button>
       <button id="hyperlinkButton" class="toolbar-btn" type="button" data-short="LINK" data-tooltip="Toggle hyperlink overlay" aria-pressed="false">
+        <i class="codicon codicon-link" aria-hidden="true"></i>
         <span class="label">Links</span>
       </button>
       <button id="emojiButton" class="toolbar-btn" type="button" data-short="INS" data-tooltip="Insert symbols" aria-expanded="false" aria-controls="emojiPanel">
+        <i class="codicon codicon-symbol-namespace" aria-hidden="true"></i>
         <span class="label">Insert</span>
       </button>
       <button id="downloadButton" class="toolbar-btn" type="button" data-short="SAVE" data-tooltip="Download as text file" aria-label="Download as text file">
+        <i class="codicon codicon-save" aria-hidden="true"></i>
         <span class="label">Export</span>
       </button>
       <button id="compactButton" class="toolbar-btn" type="button" data-short="CMP" data-tooltip="Toggle compact toolbar" aria-pressed="false">
+        <i class="codicon codicon-layout-activitybar-left" aria-hidden="true"></i>
         <span class="label">Compact</span>
       </button>
     </header>
@@ -73,7 +82,9 @@
     <div id="colorPickerPanel" class="color-picker hidden" role="dialog" aria-label="Color picker" aria-modal="false">
       <header class="color-picker-header">
         <span>Background Color</span>
-        <button id="closeColorPicker" type="button" class="icon-btn" aria-label="Close color picker">✕</button>
+        <button id="closeColorPicker" type="button" class="icon-btn" aria-label="Close color picker">
+          <i class="codicon codicon-close" aria-hidden="true"></i>
+        </button>
       </header>
       <div class="picker-row">
         <label for="hueControl">Hue</label>
@@ -93,23 +104,44 @@
     </div>
 
     <nav id="radialMenu" class="radial-menu hidden" role="menu" aria-label="Radial shortcuts">
-      <button class="radial-item" data-action="copy-all" type="button" role="menuitem" data-tooltip="Copy note" aria-label="Copy note">CPY</button>
-      <button class="radial-item" data-action="cut-all" type="button" role="menuitem" data-tooltip="Cut note" aria-label="Cut note">CUT</button>
-      <button class="radial-item" data-action="download" type="button" role="menuitem" data-tooltip="Download note" aria-label="Download note">SAVE</button>
-      <button class="radial-item" data-action="color" type="button" role="menuitem" data-tooltip="Background color" aria-label="Background color">BG</button>
+      <button class="radial-item" data-action="copy-all" type="button" role="menuitem" data-tooltip="Copy note" aria-label="Copy note">
+        <i class="codicon codicon-copy" aria-hidden="true"></i>
+        <span class="sr-only">Copy</span>
+      </button>
+      <button class="radial-item" data-action="cut-all" type="button" role="menuitem" data-tooltip="Cut note" aria-label="Cut note">
+        <i class="codicon codicon-scissors" aria-hidden="true"></i>
+        <span class="sr-only">Cut</span>
+      </button>
+      <button class="radial-item" data-action="download" type="button" role="menuitem" data-tooltip="Download note" aria-label="Download note">
+        <i class="codicon codicon-save" aria-hidden="true"></i>
+        <span class="sr-only">Save</span>
+      </button>
+      <button class="radial-item" data-action="color" type="button" role="menuitem" data-tooltip="Background color" aria-label="Background color">
+        <i class="codicon codicon-symbol-color" aria-hidden="true"></i>
+        <span class="sr-only">Color</span>
+      </button>
     </nav>
 
     <footer class="status-bar">
       <span id="storageUsage" class="storage-usage" aria-live="polite">Storage: --</span>
-      <button id="clearStorageButton" type="button" class="status-btn" data-tooltip="Reset saved note and preferences">Clear Saved Data</button>
+      <button id="clearStorageButton" type="button" class="status-btn" data-tooltip="Reset saved note and preferences">
+        <i class="codicon codicon-database" aria-hidden="true"></i>
+        <span class="label">Clear Saved Data</span>
+      </button>
     </footer>
 
     <div id="confirmOverlay" class="confirm-overlay hidden" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="confirmMessage">
       <div class="confirm-panel">
         <p id="confirmMessage" class="confirm-message">Confirm action?</p>
         <div class="confirm-actions">
-          <button id="confirmCancelButton" type="button" class="status-btn" data-tooltip="Cancel action">Cancel</button>
-          <button id="confirmAcceptButton" type="button" class="status-btn confirm" data-tooltip="Proceed with action">Confirm</button>
+          <button id="confirmCancelButton" type="button" class="status-btn" data-tooltip="Cancel action">
+            <i class="codicon codicon-discard" aria-hidden="true"></i>
+            <span class="label">Cancel</span>
+          </button>
+          <button id="confirmAcceptButton" type="button" class="status-btn confirm" data-tooltip="Proceed with action">
+            <i class="codicon codicon-check" aria-hidden="true"></i>
+            <span class="label">Confirm</span>
+          </button>
         </div>
       </div>
     </div>

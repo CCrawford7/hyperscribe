@@ -134,6 +134,30 @@ body.body-dark {
   font-weight: 600;
 }
 
+.toolbar-btn .codicon,
+.toggle-btn .codicon,
+.status-btn .codicon,
+.icon-btn .codicon {
+  font-size: 1rem;
+  margin-right: 6px;
+}
+
+.icon-btn .codicon {
+  margin-right: 0;
+}
+
+.toolbar-btn .codicon[aria-hidden="true"],
+.toggle-btn .codicon[aria-hidden="true"],
+.status-btn .codicon[aria-hidden="true"],
+.icon-btn .codicon[aria-hidden="true"] {
+  pointer-events: none;
+}
+
+.toolbar-compact .toolbar-btn .codicon {
+  margin-right: 0;
+  font-size: 1.1rem;
+}
+
 .toolbar-compact .toolbar-btn {
   padding: 6px 4px;
   font-size: 0.66rem;
@@ -488,6 +512,11 @@ body.body-dark {
   backdrop-filter: blur(3px);
 }
 
+.radial-item .codicon {
+  font-size: 1.15rem;
+  margin: 0;
+}
+
 .radial-item:hover,
 .radial-item:focus-visible {
   background: var(--accent-muted);
@@ -604,4 +633,16 @@ body.body-dark {
   background: var(--accent-muted);
   border-color: var(--accent-primary);
   color: var(--accent-primary);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
