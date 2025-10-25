@@ -1,13 +1,13 @@
 # Quick Notepad Chrome Extension
 
-Quick Notepad is a minimalist popup notepad for Chrome that keeps a single note—plus all of your layout and styling preferences—persistent across sessions using `chrome.storage.local`. It ships with a compact toolbar, emoji picker, hyperlinking support, a middle-click radial menu, and a live HSL background color picker.
+Quick Notepad is a minimalist popup notepad for Chrome that keeps a single note—plus all of your layout and styling preferences—persistent across sessions using `chrome.storage.local`. It ships with a compact toolbar, emoji picker, hyperlinking support, a live HSL background color picker, and a quick-close control when you need to tuck it away.
 
 ## Features
 - **Persistent note** stored in `chrome.storage.local`, synced with background defaults.
-- **Toolbar actions** for copy all, theme toggle, font tuning (size, family, bold, italic), hyperlink detection, emoji picker, download-as-txt, and compact mode.
+- **Toolbar actions** for copy all, theme toggle, background color picker, font tuning (size, family, bold, italic), hyperlink detection, emoji picker, download-as-txt, and compact mode.
 - **Emoji grid** that inserts characters at the cursor position.
 - **Hyperlink overlay** that linkifies URLs when enabled without interfering with editing.
-- **Radial menu** (hold middle mouse button in the popup) for quick copy, cut, download, and color picker access.
+- **Quick close dot** so you can dismiss the popup manually after copying from the main page.
 - **Color picker panel** driven by HSL sliders with live hex readout.
 - **Resizable textarea** so the popup can adapt to your preferred layout.
 
@@ -15,7 +15,7 @@ Quick Notepad is a minimalist popup notepad for Chrome that keeps a single note�
 1. Open `chrome://extensions` in Chrome.
 2. Toggle on **Developer mode** (top-right).
 3. Click **Load unpacked** and select the `quick-notepad/` directory from this repository.
-4. Activate the extension from the toolbar and exercise the toolbar toggles, hyperlink mode, emoji picker, radial menu, and download feature to ensure everything works as expected.
+4. Activate the extension from the toolbar and exercise the toolbar toggles, hyperlink mode, emoji picker, color picker, and download feature to ensure everything works as expected.
 
 > ℹ️ This project does not currently include automated test coverage. Manual verification via the popup is recommended after each change.
 

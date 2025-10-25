@@ -1,4 +1,3 @@
-import RadialMenu from './modules/radialMenu.js';
 import ColorPicker from './modules/colorPicker.js';
 import { downloadAsText } from './modules/downloadHelper.js';
 import FontManager from './modules/fontManager.js';
@@ -11,6 +10,7 @@ const elements = {
   copyButton: document.getElementById('copyButton'),
   clearNoteButton: document.getElementById('clearNoteButton'),
   darkModeButton: document.getElementById('darkModeButton'),
+  colorButton: document.getElementById('colorButton'),
   fontButton: document.getElementById('fontButton'),
   hyperlinkButton: document.getElementById('hyperlinkButton'),
   emojiButton: document.getElementById('emojiButton'),
@@ -27,7 +27,6 @@ const elements = {
   noteContainer: document.querySelector('.note-container'),
   noteArea: document.getElementById('noteArea'),
   linkOverlay: document.getElementById('linkOverlay'),
-  radialMenu: document.getElementById('radialMenu'),
   colorPickerPanel: document.getElementById('colorPickerPanel'),
   hueControl: document.getElementById('hueControl'),
   saturationControl: document.getElementById('saturationControl'),
@@ -39,7 +38,8 @@ const elements = {
   confirmOverlay: document.getElementById('confirmOverlay'),
   confirmMessage: document.getElementById('confirmMessage'),
   confirmAcceptButton: document.getElementById('confirmAcceptButton'),
-  confirmCancelButton: document.getElementById('confirmCancelButton')
+  confirmCancelButton: document.getElementById('confirmCancelButton'),
+  closePopupButton: document.getElementById('closePopupButton')
 };
 
 const emojiList = [
@@ -104,14 +104,11 @@ const colorPicker = new ColorPicker({
   },
   onChange: handleColorChange,
   onClose: () => {
+    if (elements.colorButton) {
+      elements.colorButton.setAttribute('aria-pressed', 'false');
+    }
     elements.noteArea.focus();
   }
-});
-
-const radialMenu = new RadialMenu({
-  trigger: elements.noteArea,
-  menu: elements.radialMenu,
-  onAction: handleRadialAction
 });
 
 init();
@@ -170,12 +167,16 @@ function applyStateToUI() {
 
   colorPicker.apply(state.backgroundColor);
   applyBackgroundColor(state.backgroundColor);
+  if (elements.colorButton) {
+    elements.colorButton.setAttribute('aria-pressed', 'false');
+  }
 }
 
 function bindEvents() {
   elements.copyButton.addEventListener('click', copyAll);
   elements.clearNoteButton.addEventListener('click', clearNote);
   elements.darkModeButton.addEventListener('click', () => toggleDarkMode());
+  elements.colorButton?.addEventListener('click', toggleColorPickerFromButton);
   elements.fontButton.addEventListener('click', toggleFontPanel);
   elements.hyperlinkButton.addEventListener('click', () => toggleHyperlinks());
   elements.emojiButton.addEventListener('click', toggleEmojiPanel);
@@ -183,6 +184,7 @@ function bindEvents() {
   elements.compactButton.addEventListener('click', () => setCompactMode(!state.compactMode));
   elements.clearStorageButton.addEventListener('click', clearStoredData);
   elements.noteArea.addEventListener('input', handleNoteChange);
+  elements.closePopupButton?.addEventListener('click', () => window.close());
   elements.confirmAcceptButton?.addEventListener('click', () => resolveConfirmation(true));
   elements.confirmCancelButton?.addEventListener('click', () => resolveConfirmation(false));
   elements.confirmOverlay?.addEventListener('click', handleConfirmOverlayClick);
@@ -199,25 +201,6 @@ function handleColorChange(colorState) {
   state.backgroundColor = colorState;
   applyBackgroundColor(colorState);
   scheduleSave({ backgroundColor: state.backgroundColor });
-}
-
-function handleRadialAction(action) {
-  switch (action) {
-    case 'copy-all':
-      copyAll();
-      break;
-    case 'cut-all':
-      cutAll();
-      break;
-    case 'download':
-      downloadNote();
-      break;
-    case 'color':
-      colorPicker.toggle({ anchor: radialMenu.getPosition() });
-      break;
-    default:
-      break;
-  }
 }
 
 function handleNoteChange(event) {
@@ -312,6 +295,12 @@ function toggleFontPanel() {
   if (next) {
     elements.emojiPanel.classList.add('hidden');
     elements.emojiButton.setAttribute('aria-expanded', 'false');
+    if (elements.colorPickerPanel && !elements.colorPickerPanel.classList.contains('hidden')) {
+      colorPicker.hide();
+    }
+    if (elements.colorButton) {
+      elements.colorButton.setAttribute('aria-pressed', 'false');
+    }
   }
 }
 
@@ -323,6 +312,12 @@ function toggleEmojiPanel() {
   if (next) {
     elements.fontPanel.classList.add('hidden');
     elements.fontButton.setAttribute('aria-expanded', 'false');
+    if (elements.colorPickerPanel && !elements.colorPickerPanel.classList.contains('hidden')) {
+      colorPicker.hide();
+    }
+    if (elements.colorButton) {
+      elements.colorButton.setAttribute('aria-pressed', 'false');
+    }
   }
 }
 
@@ -332,9 +327,16 @@ function toggleHyperlinks(forceState, options = {}) {
   elements.hyperlinkButton.setAttribute('aria-pressed', String(next));
   if (next) {
     updateLinkOverlay(state.note);
+    if (!state.note.trim()) {
+      elements.linkOverlay.style.display = 'none';
+      elements.linkOverlay.classList.remove('active');
+      elements.linkOverlay.setAttribute('aria-hidden', 'true');
+    }
   } else {
     elements.linkOverlay.classList.remove('active');
     elements.linkOverlay.innerHTML = '';
+    elements.linkOverlay.style.display = 'none';
+    elements.linkOverlay.setAttribute('aria-hidden', 'true');
   }
   if (!options.skipSave) {
     scheduleSave({ hyperlinks: state.hyperlinks });
@@ -365,11 +367,16 @@ function insertEmoji(emoji) {
 
 function updateLinkOverlay(text) {
   if (!state.hyperlinks) {
+    elements.linkOverlay.classList.remove('active');
+    elements.linkOverlay.style.display = 'none';
+    elements.linkOverlay.setAttribute('aria-hidden', 'true');
     return;
   }
   if (!text.trim()) {
     elements.linkOverlay.innerHTML = '';
     elements.linkOverlay.classList.remove('active');
+    elements.linkOverlay.style.display = 'none';
+    elements.linkOverlay.setAttribute('aria-hidden', 'true');
     return;
   }
   const escaped = escapeHTML(text);
@@ -379,6 +386,8 @@ function updateLinkOverlay(text) {
   });
   elements.linkOverlay.innerHTML = linked;
   elements.linkOverlay.classList.add('active');
+  elements.linkOverlay.style.display = 'block';
+  elements.linkOverlay.setAttribute('aria-hidden', 'false');
   syncOverlayScroll();
 }
 
@@ -415,7 +424,7 @@ function handleDocumentClick(event) {
   if (
     !elements.colorPickerPanel.classList.contains('hidden') &&
     !elements.colorPickerPanel.contains(event.target) &&
-    !elements.radialMenu.contains(event.target)
+    !(elements.colorButton && elements.colorButton.contains(event.target))
   ) {
     colorPicker.hide();
   }
@@ -493,7 +502,7 @@ function updateNoteContrast() {
   elements.noteArea.style.setProperty('--note-selection-bg', selectionBg);
   elements.noteArea.style.setProperty('--note-selection-text', selectionText);
   elements.noteArea.style.color = textColor;
-  elements.noteArea.style.caretColor = textColor;
+  elements.noteArea.style.caretColor = isDarkBackground ? textColor : 'auto';
 
   elements.linkOverlay.style.setProperty('--note-text-color', textColor);
   elements.linkOverlay.style.color = textColor;
@@ -540,6 +549,34 @@ function formatBytes(bytes) {
   }
   const precision = value >= 10 ? 1 : 2;
   return `${value.toFixed(precision)} ${units[unitIndex]}`;
+}
+
+function toggleColorPickerFromButton() {
+  if (!elements.colorPickerPanel) {
+    return;
+  }
+  const opening = elements.colorPickerPanel.classList.contains('hidden');
+  if (elements.colorButton) {
+    elements.colorButton.setAttribute('aria-pressed', String(opening));
+  }
+  if (elements.fontPanel && !elements.fontPanel.classList.contains('hidden')) {
+    elements.fontPanel.classList.add('hidden');
+    elements.fontButton.setAttribute('aria-expanded', 'false');
+  }
+  if (elements.emojiPanel && !elements.emojiPanel.classList.contains('hidden')) {
+    elements.emojiPanel.classList.add('hidden');
+    elements.emojiButton.setAttribute('aria-expanded', 'false');
+  }
+  const anchor = elements.colorButton
+    ? (() => {
+        const rect = elements.colorButton.getBoundingClientRect();
+        return {
+          x: rect.left + rect.width / 2,
+          y: rect.bottom + 12
+        };
+      })()
+    : undefined;
+  colorPicker.toggle({ anchor });
 }
 
 function performClearNote() {

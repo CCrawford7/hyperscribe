@@ -53,6 +53,7 @@ body.body-dark {
   height: 100%;
   padding: 12px;
   gap: 12px;
+  position: relative;
 }
 
 .theme-dark {
@@ -362,9 +363,7 @@ body.body-dark {
   white-space: pre-wrap;
   word-break: break-word;
   pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transition: opacity var(--transition-fast);
+  display: none;
 }
 
 .link-overlay a {
@@ -374,8 +373,7 @@ body.body-dark {
 }
 
 .link-overlay.active {
-  opacity: 1;
-  visibility: visible;
+  display: block;
 }
 
 .color-picker {
@@ -461,95 +459,6 @@ body.body-dark {
   background: var(--accent-muted);
   color: var(--accent-primary);
   border-color: var(--accent-primary);
-}
-
-.radial-menu {
-  position: absolute;
-  width: 150px;
-  height: 150px;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 30;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.12s ease;
-}
-
-.radial-menu::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border: 1px dashed currentColor;
-  background: rgba(9, 18, 29, 0.12);
-}
-
-.theme-dark .radial-menu::after {
-  background: rgba(4, 20, 7, 0.4);
-  border-color: var(--dark-border);
-}
-
-.radial-menu.active {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.radial-item {
-  position: absolute;
-  --tx: 0%;
-  --ty: 0%;
-  transform: translate(var(--tx), var(--ty));
-  width: 48px;
-  height: 48px;
-  border: 1px solid currentColor;
-  border-radius: var(--border-radius);
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: transform var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
-  backdrop-filter: blur(3px);
-}
-
-.radial-item .codicon {
-  font-size: 1.15rem;
-  margin: 0;
-}
-
-.radial-item:hover,
-.radial-item:focus-visible {
-  background: var(--accent-muted);
-  color: var(--accent-primary);
-  border-color: var(--accent-primary);
-  outline: none;
-  transform: translate(var(--tx), var(--ty)) scale(1.08);
-}
-
-.radial-item:nth-child(1) {
-  --tx: -50%;
-  --ty: -120%;
-}
-
-.radial-item:nth-child(2) {
-  --tx: -120%;
-  --ty: -20%;
-}
-
-.radial-item:nth-child(3) {
-  --tx: -50%;
-  --ty: 100%;
-}
-
-.radial-item:nth-child(4) {
-  --tx: 100%;
-  --ty: -20%;
 }
 
 .status-bar {
@@ -639,6 +548,38 @@ body.body-dark {
   background: var(--accent-muted);
   border-color: var(--accent-primary);
   color: var(--accent-primary);
+}
+
+.close-dot {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--light-border);
+  background: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: transform var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+
+.close-dot:hover {
+  transform: scale(1.1);
+  border-color: var(--accent-primary);
+  background: var(--accent-muted);
+}
+
+.close-dot:focus-visible {
+  transform: scale(1.1);
+  border-color: var(--accent-primary);
+  background: var(--accent-muted);
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.theme-dark .close-dot {
+  border-color: var(--dark-border);
+  background: rgba(51, 255, 128, 0.18);
 }
 
 .sr-only {

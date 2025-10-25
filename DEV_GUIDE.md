@@ -15,7 +15,7 @@ quick-notepad/
 │   ├── colorPicker.js    # HSL color controls and popup positioning logic
 │   ├── downloadHelper.js # Wrapper around chrome.downloads plus fallback
 │   ├── fontManager.js    # Font controls (size/family/style) synced to the textarea
-│   └── radialMenu.js     # Middle-click radial menu interactions
+│   └── radialMenu.js     # Legacy radial menu interactions (not wired into the current UI)
 ├── icons/                # Icon bundle (16/48/128)
 └── assets/splash.png     # Placeholder product art for the Chrome Web Store
 ```
@@ -51,16 +51,13 @@ All UI changes funnel through `scheduleSave` in `popup.js`, which batches writes
   Keeps the textarea and hyperlink overlay in sync with chosen typography. Emits changes upstream so the popup can persist them.
 
 - **Color Picker (`modules/colorPicker.js`)**  
-  Manages the floating HSL picker triggered from the radial menu. Handles slider input, hex preview, anchor positioning, and emits live updates.
-
-- **Radial Menu (`modules/radialMenu.js`)**  
-  Listens for middle-button presses on the textarea. Displays a hold-to-open radial menu with shortcuts to copy, cut, download, and open the color picker.
+  Manages the floating HSL picker triggered from the toolbar color button. Handles slider input, hex preview, anchor positioning, and emits live updates.
 
 - **Download Helper (`modules/downloadHelper.js`)**  
   Wraps `chrome.downloads.download` with a fallback anchor-based download for environments where the API call fails (e.g., during development without permissions).
 
 ### Working with the Popup
-- Toolbar buttons manage note copying, theme toggling, font panel visibility, hyperlink linkification, emoji insertion, note downloads, and compact toolbar layout.
+- Toolbar buttons manage note copying, theme toggling, background color adjustments, font panel visibility, hyperlink linkification, emoji insertion, note downloads, and compact toolbar layout.
 - Compact mode collapses button labels to emoji icons and is persisted separately from the dark-mode choice.
 - The emoji grid is rendered at runtime. Update the `emojiList` array in `popup.js` to tweak options.
 - Linkification is handled via an overlay element that mirrors the textarea. The overlay only activates when the Hyperlinks toggle is enabled to keep typing unimpeded.

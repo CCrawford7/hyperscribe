@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Quick Notepad",
-  "description": "A minimalist popup notepad with smart tools, radial shortcuts, and persistent settings.",
+  "description": "A minimalist popup notepad with smart tools, terminal styling, and persistent settings.",
   "version": "1.0.0",
   "action": {
     "default_popup": "popup.html",
