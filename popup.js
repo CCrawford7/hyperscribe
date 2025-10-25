@@ -298,7 +298,7 @@ function setDarkMode(isDark, options = {}) {
   if (elements.darkModeButton) {
     elements.darkModeButton.setAttribute('aria-pressed', String(isDark));
   }
-  updateNoteContrast();
+  applyBackgroundColor(state.backgroundColor);
   if (!options.skipSave) {
     scheduleSave({ darkMode: state.darkMode });
   }
@@ -444,7 +444,7 @@ function handleKeyDown(event) {
 
 function applyBackgroundColor(color) {
   const hsl = `hsl(${color.h} ${color.s}% ${color.l}%)`;
-  const isDark = state.darkMode;
+  const isDark = Boolean(state.darkMode);
   const background = isDark ? '#000000' : hsl;
   elements.noteArea.style.backgroundColor = background;
   elements.linkOverlay.style.backgroundColor = background;
