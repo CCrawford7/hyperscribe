@@ -24,6 +24,7 @@ const elements = {
   italicToggle: document.getElementById('italicToggle'),
   emojiPanel: document.getElementById('emojiPanel'),
   emojiGrid: document.getElementById('emojiGrid'),
+  noteContainer: document.querySelector('.note-container'),
   noteArea: document.getElementById('noteArea'),
   linkOverlay: document.getElementById('linkOverlay'),
   radialMenu: document.getElementById('radialMenu'),
@@ -441,9 +442,14 @@ function handleKeyDown(event) {
 
 function applyBackgroundColor(color) {
   const hsl = `hsl(${color.h} ${color.s}% ${color.l}%)`;
-  elements.noteArea.style.backgroundColor = hsl;
-  elements.linkOverlay.style.backgroundColor = hsl;
-  elements.currentHex.textContent = color.hex;
+  const isDark = state.darkMode;
+  const background = isDark ? '#000000' : hsl;
+  elements.noteArea.style.backgroundColor = background;
+  elements.linkOverlay.style.backgroundColor = background;
+  if (elements.noteContainer) {
+    elements.noteContainer.style.backgroundColor = isDark ? '#000000' : '';
+  }
+  elements.currentHex.textContent = isDark ? '#000000' : color.hex;
   updateNoteContrast();
 }
 
@@ -475,7 +481,7 @@ function updateNoteContrast() {
     return;
   }
   const lightness = Number(state.backgroundColor?.l);
-  const isDarkBackground = Number.isFinite(lightness) ? lightness < 55 : state.darkMode;
+  const isDarkBackground = state.darkMode || (Number.isFinite(lightness) ? lightness < 55 : false);
   const textColor = isDarkBackground ? NOTE_TEXT_DARK : NOTE_TEXT_LIGHT;
   const selectionBg = isDarkBackground ? NOTE_SELECTION_DARK : NOTE_SELECTION_LIGHT;
 
