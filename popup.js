@@ -77,6 +77,8 @@ const NOTE_TEXT_LIGHT = '#09121d';
 const NOTE_TEXT_DARK = '#33ff80';
 const NOTE_SELECTION_LIGHT = 'rgba(12, 30, 54, 0.3)';
 const NOTE_SELECTION_DARK = 'rgba(51, 255, 128, 0.45)';
+const NOTE_SELECTION_TEXT_LIGHT = '#09121d';
+const NOTE_SELECTION_TEXT_DARK = '#041407';
 
 const fontManager = new FontManager({
   noteArea: elements.noteArea,
@@ -484,10 +486,12 @@ function updateNoteContrast() {
   const isDarkBackground = state.darkMode || (Number.isFinite(lightness) ? lightness < 55 : false);
   const textColor = isDarkBackground ? NOTE_TEXT_DARK : NOTE_TEXT_LIGHT;
   const selectionBg = isDarkBackground ? NOTE_SELECTION_DARK : NOTE_SELECTION_LIGHT;
+  const selectionText = isDarkBackground ? NOTE_SELECTION_TEXT_DARK : NOTE_SELECTION_TEXT_LIGHT;
 
   elements.noteArea.style.setProperty('--note-text-color', textColor);
   elements.noteArea.style.setProperty('--note-text-highlight', textColor);
   elements.noteArea.style.setProperty('--note-selection-bg', selectionBg);
+  elements.noteArea.style.setProperty('--note-selection-text', selectionText);
   elements.noteArea.style.color = textColor;
   elements.noteArea.style.caretColor = textColor;
 
