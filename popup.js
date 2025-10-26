@@ -1,5 +1,7 @@
 import { downloadAsText } from './modules/downloadHelper.js';
 import FontManager from './modules/fontManager.js';
+import MarkdownPreview from './modules/markdownPreview.js';
+import SearchReplaceManager from './modules/searchReplaceManager.js';
 
 const THEMES = {
   default_bright: { label: 'Default Bright', mode: 'light', className: 'theme-default-bright' },
@@ -15,10 +17,12 @@ const elements = {
   app: document.getElementById('app'),
   toolbar: document.getElementById('toolbar'),
   copyButton: document.getElementById('copyButton'),
+  searchButton: document.getElementById('searchButton'),
   clearNoteButton: document.getElementById('clearNoteButton'),
   themeButton: document.getElementById('themeButton'),
   themePanel: document.getElementById('themePanel'),
   fontButton: document.getElementById('fontButton'),
+  previewButton: document.getElementById('previewButton'),
   emojiButton: document.getElementById('emojiButton'),
   downloadButton: document.getElementById('downloadButton'),
   fontPanel: document.getElementById('fontPanel'),
@@ -27,6 +31,22 @@ const elements = {
   fontFamilySelect: document.getElementById('fontFamilySelect'),
   boldToggle: document.getElementById('boldToggle'),
   italicToggle: document.getElementById('italicToggle'),
+  editorContainer: document.getElementById('editorContainer'),
+  previewPane: document.getElementById('previewPane'),
+  searchBar: document.getElementById('searchBar'),
+  searchInput: document.getElementById('searchInput'),
+  searchPrevButton: document.getElementById('searchPrev'),
+  searchNextButton: document.getElementById('searchNext'),
+  searchCount: document.getElementById('searchCount'),
+  searchCloseButton: document.getElementById('searchClose'),
+  toggleReplaceButton: document.getElementById('toggleReplace'),
+  replaceControls: document.getElementById('replaceControls'),
+  replaceInput: document.getElementById('replaceInput'),
+  replaceButton: document.getElementById('replaceBtn'),
+  replaceAllButton: document.getElementById('replaceAllBtn'),
+  searchCaseSensitive: document.getElementById('searchCaseSensitive'),
+  searchWholeWord: document.getElementById('searchWholeWord'),
+  searchRegex: document.getElementById('searchRegex'),
   emojiPanel: document.getElementById('emojiPanel'),
   emojiGrid: document.getElementById('emojiGrid'),
   noteArea: document.getElementById('noteArea'),
@@ -94,10 +114,47 @@ const fontManager = new FontManager({
   onChange: handleFontChange
 });
 
+const markdownPreview = new MarkdownPreview({
+  textarea: elements.noteArea,
+  preview: elements.previewPane,
+  container: elements.editorContainer,
+  onModeChange: updatePreviewButtonState
+});
+
+let previewMode = 'edit';
+
+const searchManager = new SearchReplaceManager({
+  textarea: elements.noteArea,
+  searchBar: elements.searchBar,
+  searchInput: elements.searchInput,
+  replaceInput: elements.replaceInput,
+  prevButton: elements.searchPrevButton,
+  nextButton: elements.searchNextButton,
+  closeButton: elements.searchCloseButton,
+  replaceButton: elements.replaceButton,
+  replaceAllButton: elements.replaceAllButton,
+  toggleReplaceButton: elements.toggleReplaceButton,
+  replaceControls: elements.replaceControls,
+  countLabel: elements.searchCount,
+  caseSensitiveToggle: elements.searchCaseSensitive,
+  wholeWordToggle: elements.searchWholeWord,
+  regexToggle: elements.searchRegex,
+  onVisibilityChange: visible => {
+    elements.searchButton?.classList.toggle('is-active', visible);
+    elements.searchButton?.setAttribute('aria-pressed', String(visible));
+    if (visible && previewMode === 'preview') {
+      // ensure editing context visible for replacements
+      previewMode = 'split';
+      markdownPreview.setMode(previewMode);
+    }
+  }
+});
+
 init();
 
 async function init() {
   renderEmojiButtons();
+  updatePreviewButtonState(previewMode);
   bindEvents();
   await hydrateState();
   await updateStorageUsage();
@@ -145,16 +202,19 @@ function applyStateToUI() {
   setTheme(state.theme, { skipSave: true });
 
   fontManager.apply(state.font);
+  markdownPreview.updatePreview();
 }
 
 function bindEvents() {
   elements.copyButton.addEventListener('click', copyAll);
+  elements.searchButton?.addEventListener('click', () => toggleSearchBar(false));
   elements.clearNoteButton.addEventListener('click', clearNote);
   elements.themeButton?.addEventListener('click', toggleThemePanel);
   themeChipButtons.forEach(button => {
     button.addEventListener('click', () => handleThemeSelection(button.dataset.theme));
   });
   elements.fontButton.addEventListener('click', toggleFontPanel);
+  elements.previewButton?.addEventListener('click', togglePreviewMode);
   elements.emojiButton.addEventListener('click', toggleEmojiPanel);
   elements.downloadButton.addEventListener('click', downloadNote);
   elements.clearStorageButton.addEventListener('click', clearStoredData);
@@ -171,6 +231,36 @@ function bindEvents() {
 function handleFontChange(fontState) {
   state.font = fontState;
   scheduleSave({ font: state.font });
+}
+
+function togglePreviewMode() {
+  previewMode = markdownPreview.cycleMode();
+  updatePreviewButtonState(previewMode);
+}
+
+function updatePreviewButtonState(mode) {
+  if (!elements.previewButton) {
+    return;
+  }
+  const labels = {
+    edit: 'Markdown preview disabled',
+    split: 'Markdown preview (split view)',
+    preview: 'Markdown preview only'
+  };
+  const descriptor = labels[mode] ?? 'Markdown preview';
+  elements.previewButton.setAttribute('data-tooltip', descriptor);
+  elements.previewButton.setAttribute('aria-label', descriptor);
+  elements.previewButton.dataset.mode = mode;
+  elements.previewButton.classList.toggle('is-active', mode !== 'edit');
+}
+
+function toggleSearchBar(withReplace = false) {
+  const isOpen = elements.searchBar && !elements.searchBar.classList.contains('hidden');
+  if (isOpen) {
+    searchManager.close();
+  } else {
+    searchManager.open(withReplace);
+  }
 }
 
 function toggleThemePanel() {
@@ -230,6 +320,7 @@ function focusActiveThemeChip() {
 function handleNoteChange(event) {
   state.note = event.target.value;
   scheduleSave({ note: state.note });
+  markdownPreview.scheduleUpdate();
 }
 
 function scheduleSave(partial) {

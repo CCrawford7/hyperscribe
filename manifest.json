@@ -18,7 +18,8 @@
   },
   "permissions": [
     "storage",
-    "downloads"
+    "downloads",
+    "tabs"
   ],
   "icons": {
     "16": "icons/icon16.png",

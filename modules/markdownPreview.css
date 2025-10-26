@@ -1,0 +1,165 @@
+.editor-container {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.editor-container.edit-only .note-area {
+  display: block;
+}
+
+.editor-container.edit-only .preview-pane {
+  display: none;
+}
+
+.editor-container.split-view .note-area,
+.editor-container.split-view .preview-pane {
+  width: 50%;
+}
+
+.editor-container.split-view .preview-pane {
+  display: block;
+}
+
+.editor-container.preview-only .note-area {
+  display: none;
+}
+
+.editor-container.preview-only .preview-pane {
+  display: block;
+  width: 100%;
+}
+
+.note-area {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+}
+
+.preview-pane {
+  flex: 1 1 auto;
+  display: none;
+  padding: 16px;
+  overflow-y: auto;
+  background: var(--note-container-bg);
+  color: var(--note-text-color);
+  font-family: var(--font-family);
+  line-height: 1.5;
+}
+
+.preview-pane.hidden {
+  display: none !important;
+}
+
+.preview-pane h1 {
+  font-size: 2em;
+  margin: 0.67em 0;
+}
+
+.preview-pane h2 {
+  font-size: 1.5em;
+  margin: 0.75em 0;
+}
+
+.preview-pane h3 {
+  font-size: 1.17em;
+  margin: 0.83em 0;
+}
+
+.preview-pane code {
+  background: var(--note-selection-bg);
+  color: var(--note-selection-text);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.preview-pane pre {
+  background: rgba(0, 0, 0, 0.08);
+  color: inherit;
+  padding: 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 1rem 0;
+  position: relative;
+}
+
+.theme-dark .preview-pane pre {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.preview-pane a {
+  color: var(--accent-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.preview-pane a:hover {
+  color: var(--accent-primary);
+  text-decoration: none;
+}
+
+.preview-pane blockquote {
+  border-left: 4px solid var(--accent-primary);
+  padding-left: 16px;
+  margin: 16px 0;
+  font-style: italic;
+}
+
+.copy-code-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: inherit;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.copy-code-btn .codicon {
+  margin: 0;
+}
+
+.preview-pane pre:hover .copy-code-btn,
+.copy-code-btn:focus-visible {
+  opacity: 1;
+}
+
+.copy-code-btn:hover {
+  background: rgba(0, 0, 0, 0.55);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.copy-code-btn.copied {
+  background: rgba(51, 255, 128, 0.25);
+  border-color: rgba(51, 255, 128, 0.6);
+  color: var(--accent-primary);
+}
+
+.copy-code-btn.error {
+  background: rgba(255, 59, 48, 0.25);
+  border-color: rgba(255, 59, 48, 0.6);
+  color: #ff3b30;
+}
+
+.theme-dark .copy-code-btn {
+  background: rgba(51, 255, 128, 0.1);
+  border-color: rgba(51, 255, 128, 0.25);
+}
+
+.theme-dark .copy-code-btn:hover {
+  background: rgba(51, 255, 128, 0.2);
+  border-color: rgba(51, 255, 128, 0.45);
+}

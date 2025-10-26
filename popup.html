@@ -9,6 +9,8 @@
   <link rel="stylesheet" href="https://microsoft.github.io/vscode-codicons/dist/codicon.css">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Roboto:wght@400;700&family=Merriweather:wght@400;700&family=Space+Mono:wght@400;700&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="popup.css">
+  <link rel="stylesheet" href="modules/markdownPreview.css">
+  <link rel="stylesheet" href="libs/highlight.github-dark.min.css">
 </head>
 <body>
   <div id="app" class="theme-light">
@@ -16,6 +18,10 @@
       <button id="copyButton" class="toolbar-btn" type="button" data-short="CPY" data-tooltip="Copy note" aria-label="Copy note">
         <i class="codicon codicon-copy" aria-hidden="true"></i>
         <span class="label">Copy</span>
+      </button>
+      <button id="searchButton" class="toolbar-btn" type="button" data-short="FND" data-tooltip="Search notes" aria-label="Search notes">
+        <i class="codicon codicon-search" aria-hidden="true"></i>
+        <span class="label">Find</span>
       </button>
       <button id="clearNoteButton" class="toolbar-btn" type="button" data-short="CLR" data-tooltip="Clear note text" aria-label="Clear note text">
         <i class="codicon codicon-clear-all" aria-hidden="true"></i>
@@ -28,6 +34,10 @@
       <button id="fontButton" class="toolbar-btn" type="button" data-short="FONT" data-tooltip="Font controls" aria-expanded="false" aria-controls="fontPanel">
         <i class="codicon codicon-text-size" aria-hidden="true"></i>
         <span class="label">Fonts</span>
+      </button>
+      <button id="previewButton" class="toolbar-btn" type="button" data-short="MD" data-tooltip="Toggle markdown preview" aria-label="Toggle markdown preview">
+        <i class="codicon codicon-preview" aria-hidden="true"></i>
+        <span class="label">Preview</span>
       </button>
       <button id="emojiButton" class="toolbar-btn" type="button" data-short="INS" data-tooltip="Insert symbols" aria-expanded="false" aria-controls="emojiPanel">
         <i class="codicon codicon-symbol-namespace" aria-hidden="true"></i>
@@ -91,8 +101,51 @@
       <div id="emojiGrid" class="emoji-grid" role="grid" aria-live="polite"></div>
     </section>
 
+    <div id="searchBar" class="search-bar hidden" role="region" aria-label="Search and replace">
+      <div class="search-controls">
+        <input type="text" id="searchInput" placeholder="Find..." aria-label="Search text">
+        <button id="searchPrev" class="search-btn" type="button" title="Previous (Shift+Enter)" aria-label="Find previous">
+          <i class="codicon codicon-arrow-up" aria-hidden="true"></i>
+        </button>
+        <button id="searchNext" class="search-btn" type="button" title="Next (Enter)" aria-label="Find next">
+          <i class="codicon codicon-arrow-down" aria-hidden="true"></i>
+        </button>
+        <span id="searchCount" class="search-count" aria-live="polite">0 / 0</span>
+        <button id="toggleReplace" class="search-btn" type="button" title="Toggle replace panel" aria-label="Toggle replace options" aria-controls="replaceControls" aria-expanded="false">
+          <i class="codicon codicon-arrow-swap" aria-hidden="true"></i>
+        </button>
+        <button id="searchClose" class="search-btn" type="button" title="Close (Esc)" aria-label="Close search">
+          <i class="codicon codicon-close" aria-hidden="true"></i>
+        </button>
+      </div>
+      <div id="replaceControls" class="replace-controls hidden">
+        <input type="text" id="replaceInput" placeholder="Replace with..." aria-label="Replacement text">
+        <div class="replace-actions">
+          <button id="replaceBtn" class="search-btn" type="button">Replace</button>
+          <button id="replaceAllBtn" class="search-btn" type="button">Replace All</button>
+        </div>
+      </div>
+      <div class="search-options">
+        <label>
+          <input type="checkbox" id="searchCaseSensitive">
+          <span>Aa</span>
+        </label>
+        <label>
+          <input type="checkbox" id="searchWholeWord">
+          <span>Whole</span>
+        </label>
+        <label>
+          <input type="checkbox" id="searchRegex">
+          <span>Regex</span>
+        </label>
+      </div>
+    </div>
+
     <div class="note-container">
-      <textarea id="noteArea" placeholder="Type your note..." aria-label="Note text area" autofocus spellcheck="false"></textarea>
+      <div id="editorContainer" class="editor-container edit-only">
+        <textarea id="noteArea" class="note-area" placeholder="Type your note..." aria-label="Note text area" autofocus spellcheck="false"></textarea>
+        <div id="previewPane" class="preview-pane hidden" aria-label="Markdown preview" role="region"></div>
+      </div>
     </div>
 
     <footer class="status-bar">
@@ -125,6 +178,14 @@
     <div id="resizeHandle" class="resize-handle" role="presentation" aria-hidden="true"></div>
   </div>
 
+  <script src="libs/marked.min.js"></script>
+  <script src="libs/purify.min.js"></script>
+  <script src="libs/highlight.min.js"></script>
+  <script src="libs/highlight.javascript.min.js"></script>
+  <script src="libs/highlight.python.min.js"></script>
+  <script src="libs/highlight.json.min.js"></script>
+  <script src="libs/highlight.css.min.js"></script>
+  <script src="libs/highlight.html.min.js"></script>
   <script type="module" src="popup.js"></script>
 </body>
 </html>
