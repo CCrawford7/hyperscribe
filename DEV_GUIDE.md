@@ -5,7 +5,7 @@ Quick Notepad is a minimalist Chrome extension popup that keeps quick notes, for
 
 ### File Structure
 ```
-quick-notepad/
+hyperscribe/
 ├── manifest.json         # Chrome extension manifest (MV3)
 ├── background.js         # Service worker used to seed default state
 ├── popup.html            # Popup markup, toolbar, panels, and containers
@@ -42,7 +42,7 @@ All UI changes funnel through `scheduleSave` in `popup.js`, which batches writes
   Keeps the textarea typography in sync with the chosen controls and emits changes upstream so the popup can persist them.
 
 - **Download Helper (`modules/downloadHelper.js`)**  
-  Wraps `chrome.downloads.download` with a fallback anchor-based download for environments where the API call fails (e.g., during development without permissions).
+  Wraps `chrome.downloads.download` with a fallback anchor-based download for environments where the API call fails (e.g., during development without permissions). File exports default to `hyprscr-DD-MM-YYYY.txt` to keep local notes organized chronologically.
 
 ### Working with the Popup
 - Toolbar controls cover note copying/clearing, the compact theme button (opens a preset panel for Default Bright, Default Dark, Monokai, Nord, Dracula), font panel toggle, emoji picker, and exporting notes.
@@ -67,8 +67,8 @@ All UI changes funnel through `scheduleSave` in `popup.js`, which batches writes
    For unit-level validation, consider adding Jest or Vitest with jsdom to exercise the modules in isolation. Keep test files outside the packed extension (e.g., under a sibling `tests/` directory).
 
 ### Packaging Tips
-- Run `chrome://extensions`, enable *Developer mode*, use *Load unpacked*, and select the `quick-notepad/` directory to test locally.
-- Before zipping, ensure no stray log or build artifacts remain. Chrome Web Store uploads typically expect the root folder content zipped (e.g., `zip -r quick-notepad.zip quick-notepad`).
+- Run `chrome://extensions`, enable *Developer mode*, use *Load unpacked*, and select the `hyperscribe/` directory to test locally.
+- Before zipping, ensure no stray log or build artifacts remain. Chrome Web Store uploads typically expect the root folder content zipped (e.g., `zip -r hyperscribe.zip hyperscribe`).
 - Update `assets/splash.png` with final marketing artwork before submitting to the store.
 - Increment the `version` in `manifest.json` for each publish, following semantic versioning.
 

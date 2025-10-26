@@ -41,6 +41,9 @@
 - **Emoji & insert tooling**  
   Added an emoji panel with accessible grid navigation and insertion logic while keeping clipboard helpers intact.
 
+- **TXT export renaming**  
+  Updated the download helper wiring so text exports use the `hyprscr-DD-MM-YYYY.txt` convention and refreshed documentation to reference the Hyperscribe folder name.
+
 - **Confirmation overlay and status bar**  
   Built a custom confirmation modal with “don’t ask again” support, storage usage meter, and icon-only status actions that harmonize with the terminal theme.
 

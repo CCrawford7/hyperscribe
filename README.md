@@ -5,6 +5,7 @@ Quick Notepad is a minimalist popup notepad for Chrome that keeps a single note‚
 ## Features
 - **Persistent note** stored in `chrome.storage.local`, synced with background defaults.
 - **Toolbar actions** for copy/clear, the compact theme button with preset panel (Default Bright, Default Dark, Monokai, Nord, Dracula), font tuning (size, family, bold, italic), emoji picker, and download-as-txt.
+- **TXT exports** default to filenames like `hyprscr-28-03-2024.txt` for quick chronological sorting.
 - **Emoji grid** that inserts characters at the cursor position.
 - **Quick close dot** so you can dismiss the popup manually after copying from the main page.
 - **Resizable popup** thanks to the yellow drag handle in the bottom-right corner; Chrome respects `window.resizeTo` within MV3 bounds.
@@ -12,7 +13,7 @@ Quick Notepad is a minimalist popup notepad for Chrome that keeps a single note‚
 ## Install & Test Locally
 1. Open `chrome://extensions` in Chrome.
 2. Toggle on **Developer mode** (top-right).
-3. Click **Load unpacked** and select the `quick-notepad/` directory from this repository.
+3. Click **Load unpacked** and select the `hyperscribe/` directory from this repository.
 4. Activate the extension from the toolbar and exercise the compact toolbar buttons, theme panel, resize handle, emoji picker, and download feature to ensure everything works as expected.
 
 > ‚ÑπÔ∏è This project does not currently include automated test coverage. Manual verification via the popup is recommended after each change.

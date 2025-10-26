@@ -283,8 +283,11 @@ function clearNote() {
 }
 
 function downloadNote() {
-  const timestamp = new Date().toISOString().replace(/[:T]/g, '-').split('.')[0];
-  const filename = `quick-note-${timestamp}.txt`;
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = String(now.getFullYear());
+  const filename = `hyprscr-${day}-${month}-${year}.txt`;
   downloadAsText(filename, elements.noteArea.value).catch(error => {
     console.warn('Quick Notepad: download failed', error);
   });
