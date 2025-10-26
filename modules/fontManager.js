@@ -6,9 +6,8 @@ const defaultFontState = {
 };
 
 export default class FontManager {
-  constructor({ noteArea, overlay, controls, onChange }) {
+  constructor({ noteArea, controls, onChange }) {
     this.noteArea = noteArea;
-    this.overlay = overlay ?? null;
     this.controls = controls;
     this.onChange = onChange;
     this.state = { ...defaultFontState };
@@ -90,12 +89,6 @@ export default class FontManager {
     this.noteArea.style.fontFamily = this.state.family;
     this.noteArea.style.fontWeight = this.state.weight;
     this.noteArea.style.fontStyle = this.state.style;
-    if (this.overlay) {
-      this.overlay.style.fontSize = `${this.state.size}px`;
-      this.overlay.style.fontFamily = this.state.family;
-      this.overlay.style.fontWeight = this.state.weight;
-      this.overlay.style.fontStyle = this.state.style;
-    }
   }
 
   emit() {

@@ -1,7 +1,7 @@
 ## Quick Notepad – Developer Guide
 
 ### Project Overview
-Quick Notepad is a minimalist Chrome extension popup that keeps quick notes, formatting preferences, and color selections synced with `chrome.storage.local`. The popup is bundled as a single HTML page (`popup.html`) with modular JavaScript to keep concerns isolated for maintenance and future expansion.
+Quick Notepad is a minimalist Chrome extension popup that keeps quick notes, formatting preferences, and theme selections synced with `chrome.storage.local`. The popup is bundled as a single HTML page (`popup.html`) with modular JavaScript to keep concerns isolated for maintenance and future expansion.
 
 ### File Structure
 ```
@@ -12,7 +12,6 @@ quick-notepad/
 ├── popup.css             # Styling for themes, toolbar, panels, and radial menu
 ├── popup.js              # Main controller: state lifecycle, storage sync, UI wiring
 ├── modules/
-│   ├── colorPicker.js    # HSL color controls and popup positioning logic
 │   ├── downloadHelper.js # Wrapper around chrome.downloads plus fallback
 │   ├── fontManager.js    # Font controls (size/family/style) synced to the textarea
 │   └── radialMenu.js     # Legacy radial menu interactions (not wired into the current UI)
@@ -26,20 +25,12 @@ The popup maintains a single `quickNotepadState` payload persisted through `chro
 ```json
 {
   "note": "",
-  "darkMode": false,
-  "compactMode": false,
-  "hyperlinks": false,
+  "theme": "default_bright",
   "font": {
     "size": 16,
     "family": "Inter, sans-serif",
     "weight": "normal",
     "style": "normal"
-  },
-  "backgroundColor": {
-    "h": 225,
-    "s": 70,
-    "l": 96,
-    "hex": "#eff3ff"
   }
 }
 ```
@@ -48,17 +39,14 @@ All UI changes funnel through `scheduleSave` in `popup.js`, which batches writes
 
 ### Modules in Detail
 - **Font Manager (`modules/fontManager.js`)**  
-  Keeps the textarea and hyperlink overlay in sync with chosen typography. Emits changes upstream so the popup can persist them.
-
-- **Color Picker (`modules/colorPicker.js`)**  
-  Manages the floating HSL picker triggered from the toolbar color button. Handles slider input, hex preview, anchor positioning, and emits live updates.
+  Keeps the textarea typography in sync with the chosen controls and emits changes upstream so the popup can persist them.
 
 - **Download Helper (`modules/downloadHelper.js`)**  
   Wraps `chrome.downloads.download` with a fallback anchor-based download for environments where the API call fails (e.g., during development without permissions).
 
 ### Working with the Popup
-- Toolbar buttons manage note copying, theme toggling, background color adjustments, font panel visibility, hyperlink linkification, emoji insertion, note downloads, and compact toolbar layout.
-- Compact mode collapses button labels to emoji icons and is persisted separately from the dark-mode choice.
+- Toolbar controls cover note copying/clearing, the compact theme button (opens a preset panel for Default Bright, Default Dark, Monokai, Nord, Dracula), font panel toggle, emoji picker, and exporting notes.
+- A yellow resize handle anchored to the bottom-right corner lets you drag the popup larger (Chrome honours `window.resizeTo` within MV3 limits).
 - The emoji grid is rendered at runtime. Update the `emojiList` array in `popup.js` to tweak options.
 - Linkification is handled via an overlay element that mirrors the textarea. The overlay only activates when the Hyperlinks toggle is enabled to keep typing unimpeded.
 
@@ -73,7 +61,7 @@ All UI changes funnel through `scheduleSave` in `popup.js`, which batches writes
    Replace the `chrome.storage.local` calls with `chrome.storage.sync` (or add a migration setting) if cross-device syncing becomes important.
 
 4. **Keyboard Shortcuts and Commands**  
-   Expand `manifest.json` with the `"commands"` section to add keyboard accelerators for copy/download/dark mode. The background service worker can relay commands to an open popup via `chrome.runtime.sendMessage`.
+   Expand `manifest.json` with the `"commands"` section to add keyboard accelerators for copy/download/theme cycling. The background service worker can relay commands to an open popup via `chrome.runtime.sendMessage`.
 
 5. **Tests and Tooling**  
    For unit-level validation, consider adding Jest or Vitest with jsdom to exercise the modules in isolation. Keep test files outside the packed extension (e.g., under a sibling `tests/` directory).

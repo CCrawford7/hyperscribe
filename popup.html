@@ -21,35 +21,48 @@
         <i class="codicon codicon-clear-all" aria-hidden="true"></i>
         <span class="label">Clear</span>
       </button>
-      <button id="darkModeButton" class="toolbar-btn" type="button" data-short="DARK" data-tooltip="Toggle terminal mode" aria-label="Toggle terminal mode">
-        <i class="codicon codicon-moon" aria-hidden="true"></i>
-        <span class="label">Mode</span>
-      </button>
-      <button id="colorButton" class="toolbar-btn" type="button" data-short="BG" data-tooltip="Adjust background color" aria-label="Adjust background color">
+      <button id="themeButton" class="toolbar-btn" type="button" data-short="THM" data-tooltip="Change theme" aria-expanded="false" aria-controls="themePanel">
         <i class="codicon codicon-symbol-color" aria-hidden="true"></i>
-        <span class="label">Color</span>
+        <span class="label">Themes</span>
       </button>
       <button id="fontButton" class="toolbar-btn" type="button" data-short="FONT" data-tooltip="Font controls" aria-expanded="false" aria-controls="fontPanel">
         <i class="codicon codicon-text-size" aria-hidden="true"></i>
         <span class="label">Fonts</span>
       </button>
-      <button id="hyperlinkButton" class="toolbar-btn" type="button" data-short="LINK" data-tooltip="Toggle hyperlink overlay" aria-pressed="false">
-        <i class="codicon codicon-link" aria-hidden="true"></i>
-        <span class="label">Links</span>
-      </button>
       <button id="emojiButton" class="toolbar-btn" type="button" data-short="INS" data-tooltip="Insert symbols" aria-expanded="false" aria-controls="emojiPanel">
         <i class="codicon codicon-symbol-namespace" aria-hidden="true"></i>
         <span class="label">Insert</span>
       </button>
-      <button id="downloadButton" class="toolbar-btn" type="button" data-short="SAVE" data-tooltip="Download as text file" aria-label="Download as text file">
+      <button id="downloadButton" class="toolbar-btn" type="button" data-short="SAVE" data-tooltip="Download as .txt" aria-label="Download as .txt">
         <i class="codicon codicon-save" aria-hidden="true"></i>
         <span class="label">Export</span>
       </button>
-      <button id="compactButton" class="toolbar-btn" type="button" data-short="CMP" data-tooltip="Toggle compact toolbar" aria-pressed="false">
-        <i class="codicon codicon-layout-activitybar-left" aria-hidden="true"></i>
-        <span class="label">Compact</span>
-      </button>
     </header>
+
+    <section id="themePanel" class="panel hidden theme-panel" aria-label="Theme presets" aria-hidden="true">
+      <div class="theme-grid">
+        <button type="button" class="theme-chip" data-theme="default_bright" aria-pressed="false">
+          <span class="theme-swatch theme-swatch-bright" aria-hidden="true"></span>
+          <span class="theme-name">Default Bright</span>
+        </button>
+        <button type="button" class="theme-chip" data-theme="default_dark" aria-pressed="false">
+          <span class="theme-swatch theme-swatch-dark" aria-hidden="true"></span>
+          <span class="theme-name">Default Dark</span>
+        </button>
+        <button type="button" class="theme-chip" data-theme="monokai" aria-pressed="false">
+          <span class="theme-swatch theme-swatch-monokai" aria-hidden="true"></span>
+          <span class="theme-name">Monokai</span>
+        </button>
+        <button type="button" class="theme-chip" data-theme="nord" aria-pressed="false">
+          <span class="theme-swatch theme-swatch-nord" aria-hidden="true"></span>
+          <span class="theme-name">Nord</span>
+        </button>
+        <button type="button" class="theme-chip" data-theme="dracula" aria-pressed="false">
+          <span class="theme-swatch theme-swatch-dracula" aria-hidden="true"></span>
+          <span class="theme-name">Dracula</span>
+        </button>
+      </div>
+    </section>
 
     <section id="fontPanel" class="panel hidden" aria-label="Font settings">
       <div class="panel-row">
@@ -79,39 +92,13 @@
     </section>
 
     <div class="note-container">
-      <textarea id="noteArea" placeholder="Type your note..." aria-label="Note text area" autofocus></textarea>
-      <div id="linkOverlay" class="link-overlay" aria-hidden="true"></div>
-    </div>
-
-    <div id="colorPickerPanel" class="color-picker hidden" role="dialog" aria-label="Color picker" aria-modal="false">
-      <header class="color-picker-header">
-        <span>Background Color</span>
-        <button id="closeColorPicker" type="button" class="icon-btn" aria-label="Close color picker">
-          <i class="codicon codicon-close" aria-hidden="true"></i>
-        </button>
-      </header>
-      <div class="picker-row">
-        <label for="hueControl">Hue</label>
-        <input id="hueControl" type="range" min="0" max="360" step="1">
-      </div>
-      <div class="picker-row">
-        <label for="saturationControl">Saturation</label>
-        <input id="saturationControl" type="range" min="0" max="100" step="1">
-      </div>
-      <div class="picker-row">
-        <label for="lightnessControl">Lightness</label>
-        <input id="lightnessControl" type="range" min="0" max="100" step="1">
-      </div>
-      <div class="picker-footer">
-        <span id="currentHex" class="value-tag">#ffffff</span>
-      </div>
+      <textarea id="noteArea" placeholder="Type your note..." aria-label="Note text area" autofocus spellcheck="false"></textarea>
     </div>
 
     <footer class="status-bar">
       <span id="storageUsage" class="storage-usage" aria-live="polite">Storage: --</span>
-      <button id="clearStorageButton" type="button" class="status-btn" data-tooltip="Reset saved note and preferences">
+      <button id="clearStorageButton" type="button" class="status-btn icon-only" data-tooltip="Reset saved note and preferences" aria-label="Clear saved data">
         <i class="codicon codicon-database" aria-hidden="true"></i>
-        <span class="label">Clear Saved Data</span>
       </button>
     </footer>
 
@@ -128,9 +115,14 @@
             <span class="label">Confirm</span>
           </button>
         </div>
+        <label class="confirm-checkbox">
+          <input id="confirmDontAskCheckbox" type="checkbox">
+          <span>Don't ask again</span>
+        </label>
       </div>
     </div>
     <button id="closePopupButton" class="close-dot" type="button" aria-label="Close Quick Notepad"></button>
+    <div id="resizeHandle" class="resize-handle" role="presentation" aria-hidden="true"></div>
   </div>
 
   <script type="module" src="popup.js"></script>

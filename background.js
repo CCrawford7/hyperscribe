@@ -2,20 +2,12 @@ const storageKey = 'quickNotepadState';
 
 const defaultState = {
   note: '',
-  darkMode: false,
-  compactMode: false,
-  hyperlinks: false,
+  theme: 'default_bright',
   font: {
     size: 16,
     family: 'Inter, sans-serif',
     weight: 'normal',
     style: 'normal'
-  },
-  backgroundColor: {
-    h: 225,
-    s: 70,
-    l: 96,
-    hex: '#eff3ff'
   }
 };
 

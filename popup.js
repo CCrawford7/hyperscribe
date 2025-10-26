@@ -1,6 +1,13 @@
-import ColorPicker from './modules/colorPicker.js';
 import { downloadAsText } from './modules/downloadHelper.js';
 import FontManager from './modules/fontManager.js';
+
+const THEMES = {
+  default_bright: { label: 'Default Bright', mode: 'light', className: 'theme-default-bright' },
+  default_dark: { label: 'Default Dark', mode: 'dark', className: 'theme-default-dark' },
+  monokai: { label: 'Monokai', mode: 'dark', className: 'theme-monokai' },
+  nord: { label: 'Nord', mode: 'dark', className: 'theme-nord' },
+  dracula: { label: 'Dracula', mode: 'dark', className: 'theme-dracula' }
+};
 
 const storageKey = 'quickNotepadState';
 
@@ -9,13 +16,11 @@ const elements = {
   toolbar: document.getElementById('toolbar'),
   copyButton: document.getElementById('copyButton'),
   clearNoteButton: document.getElementById('clearNoteButton'),
-  darkModeButton: document.getElementById('darkModeButton'),
-  colorButton: document.getElementById('colorButton'),
+  themeButton: document.getElementById('themeButton'),
+  themePanel: document.getElementById('themePanel'),
   fontButton: document.getElementById('fontButton'),
-  hyperlinkButton: document.getElementById('hyperlinkButton'),
   emojiButton: document.getElementById('emojiButton'),
   downloadButton: document.getElementById('downloadButton'),
-  compactButton: document.getElementById('compactButton'),
   fontPanel: document.getElementById('fontPanel'),
   fontSizeControl: document.getElementById('fontSizeControl'),
   fontSizeValue: document.getElementById('fontSizeValue'),
@@ -24,23 +29,19 @@ const elements = {
   italicToggle: document.getElementById('italicToggle'),
   emojiPanel: document.getElementById('emojiPanel'),
   emojiGrid: document.getElementById('emojiGrid'),
-  noteContainer: document.querySelector('.note-container'),
   noteArea: document.getElementById('noteArea'),
-  linkOverlay: document.getElementById('linkOverlay'),
-  colorPickerPanel: document.getElementById('colorPickerPanel'),
-  hueControl: document.getElementById('hueControl'),
-  saturationControl: document.getElementById('saturationControl'),
-  lightnessControl: document.getElementById('lightnessControl'),
-  currentHex: document.getElementById('currentHex'),
-  closeColorPicker: document.getElementById('closeColorPicker'),
   storageUsage: document.getElementById('storageUsage'),
   clearStorageButton: document.getElementById('clearStorageButton'),
   confirmOverlay: document.getElementById('confirmOverlay'),
   confirmMessage: document.getElementById('confirmMessage'),
   confirmAcceptButton: document.getElementById('confirmAcceptButton'),
   confirmCancelButton: document.getElementById('confirmCancelButton'),
-  closePopupButton: document.getElementById('closePopupButton')
+  confirmDontAskCheckbox: document.getElementById('confirmDontAskCheckbox'),
+  closePopupButton: document.getElementById('closePopupButton'),
+  resizeHandle: document.getElementById('resizeHandle')
 };
+
+const themeChipButtons = Array.from(document.querySelectorAll('.theme-chip'));
 
 const emojiList = [
   '😀', '😁', '😂', '🤣', '😊', '😍', '🤓', '😎', '🤩', '🥳',
@@ -51,20 +52,13 @@ const emojiList = [
 
 const defaultState = {
   note: '',
-  darkMode: false,
-  compactMode: false,
-  hyperlinks: false,
+  theme: 'default_bright',
+  suppressClearConfirm: false,
   font: {
     size: 16,
     family: 'Inter, sans-serif',
     weight: 'normal',
     style: 'normal'
-  },
-  backgroundColor: {
-    h: 225,
-    s: 70,
-    l: 96,
-    hex: '#eff3ff'
   }
 };
 
@@ -72,17 +66,24 @@ let state = structuredClone(defaultState);
 let saveTimer = null;
 let pendingConfirmation = null;
 let confirmationRestoreTarget = null;
+const RESIZE_MIN_WIDTH = 320;
+const RESIZE_MIN_HEIGHT = 360;
+const RESIZE_MAX_WIDTH = 640;
+const RESIZE_MAX_HEIGHT = 720;
+let resizeSession = null;
 
-const NOTE_TEXT_LIGHT = '#09121d';
-const NOTE_TEXT_DARK = '#33ff80';
-const NOTE_SELECTION_LIGHT = 'rgba(12, 30, 54, 0.3)';
-const NOTE_SELECTION_DARK = 'rgba(51, 255, 128, 0.45)';
-const NOTE_SELECTION_TEXT_LIGHT = '#09121d';
-const NOTE_SELECTION_TEXT_DARK = '#041407';
+function resolveThemeId(storedState) {
+  if (storedState && typeof storedState.theme === 'string' && storedState.theme in THEMES) {
+    return storedState.theme;
+  }
+  if (storedState && typeof storedState.darkMode === 'boolean') {
+    return storedState.darkMode ? 'default_dark' : 'default_bright';
+  }
+  return defaultState.theme;
+}
 
 const fontManager = new FontManager({
   noteArea: elements.noteArea,
-  overlay: elements.linkOverlay,
   controls: {
     size: elements.fontSizeControl,
     sizeIndicator: elements.fontSizeValue,
@@ -93,24 +94,6 @@ const fontManager = new FontManager({
   onChange: handleFontChange
 });
 
-const colorPicker = new ColorPicker({
-  panel: elements.colorPickerPanel,
-  controls: {
-    hue: elements.hueControl,
-    saturation: elements.saturationControl,
-    lightness: elements.lightnessControl,
-    hexLabel: elements.currentHex,
-    closeButton: elements.closeColorPicker
-  },
-  onChange: handleColorChange,
-  onClose: () => {
-    if (elements.colorButton) {
-      elements.colorButton.setAttribute('aria-pressed', 'false');
-    }
-    elements.noteArea.focus();
-  }
-});
-
 init();
 
 async function init() {
@@ -118,8 +101,6 @@ async function init() {
   bindEvents();
   await hydrateState();
   await updateStorageUsage();
-  elements.noteArea.addEventListener('scroll', syncOverlayScroll);
-  syncOverlayScroll();
 }
 
 function renderEmojiButtons() {
@@ -142,9 +123,13 @@ function renderEmojiButtons() {
 async function hydrateState() {
   try {
     const stored = await chrome.storage.local.get(storageKey);
+    const storedState = stored?.[storageKey] ?? {};
+    const theme = resolveThemeId(storedState);
+    const { darkMode: _darkMode, compactMode: _compactMode, backgroundColor: _backgroundColor, ...legacyRest } = storedState ?? {};
     state = {
       ...structuredClone(defaultState),
-      ...(stored?.[storageKey] ?? {})
+      ...legacyRest,
+      theme
     };
   } catch (error) {
     console.warn('Quick Notepad: unable to load previous state', error);
@@ -156,35 +141,26 @@ async function hydrateState() {
 
 function applyStateToUI() {
   elements.noteArea.value = state.note;
-  toggleHyperlinks(state.hyperlinks, { skipSave: true });
 
-  elements.compactButton.setAttribute('aria-pressed', String(state.compactMode));
-  setCompactMode(state.compactMode, { skipSave: true });
-
-  setDarkMode(state.darkMode, { skipSave: true });
+  setTheme(state.theme, { skipSave: true });
 
   fontManager.apply(state.font);
-
-  colorPicker.apply(state.backgroundColor);
-  applyBackgroundColor(state.backgroundColor);
-  if (elements.colorButton) {
-    elements.colorButton.setAttribute('aria-pressed', 'false');
-  }
 }
 
 function bindEvents() {
   elements.copyButton.addEventListener('click', copyAll);
   elements.clearNoteButton.addEventListener('click', clearNote);
-  elements.darkModeButton.addEventListener('click', () => toggleDarkMode());
-  elements.colorButton?.addEventListener('click', toggleColorPickerFromButton);
+  elements.themeButton?.addEventListener('click', toggleThemePanel);
+  themeChipButtons.forEach(button => {
+    button.addEventListener('click', () => handleThemeSelection(button.dataset.theme));
+  });
   elements.fontButton.addEventListener('click', toggleFontPanel);
-  elements.hyperlinkButton.addEventListener('click', () => toggleHyperlinks());
   elements.emojiButton.addEventListener('click', toggleEmojiPanel);
   elements.downloadButton.addEventListener('click', downloadNote);
-  elements.compactButton.addEventListener('click', () => setCompactMode(!state.compactMode));
   elements.clearStorageButton.addEventListener('click', clearStoredData);
   elements.noteArea.addEventListener('input', handleNoteChange);
   elements.closePopupButton?.addEventListener('click', () => window.close());
+  elements.resizeHandle?.addEventListener('pointerdown', startResize);
   elements.confirmAcceptButton?.addEventListener('click', () => resolveConfirmation(true));
   elements.confirmCancelButton?.addEventListener('click', () => resolveConfirmation(false));
   elements.confirmOverlay?.addEventListener('click', handleConfirmOverlayClick);
@@ -197,18 +173,63 @@ function handleFontChange(fontState) {
   scheduleSave({ font: state.font });
 }
 
-function handleColorChange(colorState) {
-  state.backgroundColor = colorState;
-  applyBackgroundColor(colorState);
-  scheduleSave({ backgroundColor: state.backgroundColor });
+function toggleThemePanel() {
+  if (!elements.themePanel || !elements.themeButton) {
+    return;
+  }
+  const isExpanded = elements.themeButton.getAttribute('aria-expanded') === 'true';
+  const next = !isExpanded;
+  elements.themeButton.setAttribute('aria-expanded', String(next));
+  elements.themePanel.classList.toggle('hidden', !next);
+  elements.themePanel.setAttribute('aria-hidden', String(!next));
+  if (next) {
+    elements.fontPanel.classList.add('hidden');
+    elements.fontButton.setAttribute('aria-expanded', 'false');
+    elements.emojiPanel.classList.add('hidden');
+    elements.emojiButton.setAttribute('aria-expanded', 'false');
+    focusActiveThemeChip();
+  } else {
+    elements.themeButton.focus();
+  }
+}
+
+function closeThemePanel() {
+  if (!elements.themePanel) {
+    return;
+  }
+  elements.themePanel.classList.add('hidden');
+  elements.themePanel.setAttribute('aria-hidden', 'true');
+  elements.themeButton?.setAttribute('aria-expanded', 'false');
+}
+
+function handleThemeSelection(themeId) {
+  setTheme(themeId);
+  closeThemePanel();
+  elements.themeButton?.focus();
+}
+
+function updateThemeSelectionUI(themeId) {
+  themeChipButtons.forEach(button => {
+    const isActive = button.dataset.theme === themeId;
+    button.classList.toggle('is-active', isActive);
+    button.setAttribute('aria-pressed', String(isActive));
+  });
+}
+
+function focusActiveThemeChip() {
+  const active = themeChipButtons.find(button => button.classList.contains('is-active'));
+  if (active) {
+    active.focus();
+    return;
+  }
+  if (themeChipButtons.length > 0) {
+    themeChipButtons[0].focus();
+  }
 }
 
 function handleNoteChange(event) {
   state.note = event.target.value;
   scheduleSave({ note: state.note });
-  if (state.hyperlinks) {
-    updateLinkOverlay(state.note);
-  }
 }
 
 function scheduleSave(partial) {
@@ -249,11 +270,12 @@ async function cutAll() {
 
 function clearNote() {
   const hasContent = elements.noteArea.value.trim().length > 0;
-  if (hasContent) {
+  if (hasContent && !state.suppressClearConfirm) {
     showConfirmation({
       message: 'Clear the current note? This action cannot be undone.',
       confirmLabel: 'Clear Note',
-      onConfirm: performClearNote
+      onConfirm: performClearNote,
+      includeDontAsk: true
     });
     return;
   }
@@ -268,22 +290,35 @@ function downloadNote() {
   });
 }
 
-function toggleDarkMode(forceState) {
-  const next = typeof forceState === 'boolean' ? forceState : !state.darkMode;
-  setDarkMode(next);
-}
+function setTheme(themeId, options = {}) {
+  const fallbackId = themeId in THEMES ? themeId : defaultState.theme;
+  const theme = THEMES[fallbackId];
+  const baseClass = theme.mode === 'dark' ? 'theme-dark' : 'theme-light';
+  const allThemeClasses = new Set(Object.values(THEMES).map(entry => entry.className));
+  allThemeClasses.add('theme-dark');
+  allThemeClasses.add('theme-light');
 
-function setDarkMode(isDark, options = {}) {
-  state.darkMode = isDark;
-  elements.app.classList.toggle('theme-dark', isDark);
-  elements.app.classList.toggle('theme-light', !isDark);
-  document.body.classList.toggle('body-dark', isDark);
-  if (elements.darkModeButton) {
-    elements.darkModeButton.setAttribute('aria-pressed', String(isDark));
+  if (elements.app) {
+    allThemeClasses.forEach(cls => elements.app.classList.remove(cls));
+    elements.app.classList.add(baseClass, theme.className);
   }
-  applyBackgroundColor(state.backgroundColor);
+
+  allThemeClasses.forEach(cls => document.body.classList.remove(cls));
+  document.body.classList.add(baseClass, theme.className);
+
+  state.theme = fallbackId;
+  updateThemeSelectionUI(state.theme);
+
+  if (elements.themeButton) {
+    const label = theme?.label ?? 'Theme';
+    const tooltip = `Theme: ${label}`;
+    elements.themeButton.setAttribute('data-tooltip', tooltip);
+    elements.themeButton.setAttribute('aria-label', `Change theme (current: ${label})`);
+    elements.themeButton.dataset.theme = fallbackId;
+  }
+
   if (!options.skipSave) {
-    scheduleSave({ darkMode: state.darkMode });
+    scheduleSave({ theme: state.theme });
   }
 }
 
@@ -295,12 +330,7 @@ function toggleFontPanel() {
   if (next) {
     elements.emojiPanel.classList.add('hidden');
     elements.emojiButton.setAttribute('aria-expanded', 'false');
-    if (elements.colorPickerPanel && !elements.colorPickerPanel.classList.contains('hidden')) {
-      colorPicker.hide();
-    }
-    if (elements.colorButton) {
-      elements.colorButton.setAttribute('aria-pressed', 'false');
-    }
+    closeThemePanel();
   }
 }
 
@@ -312,44 +342,7 @@ function toggleEmojiPanel() {
   if (next) {
     elements.fontPanel.classList.add('hidden');
     elements.fontButton.setAttribute('aria-expanded', 'false');
-    if (elements.colorPickerPanel && !elements.colorPickerPanel.classList.contains('hidden')) {
-      colorPicker.hide();
-    }
-    if (elements.colorButton) {
-      elements.colorButton.setAttribute('aria-pressed', 'false');
-    }
-  }
-}
-
-function toggleHyperlinks(forceState, options = {}) {
-  const next = typeof forceState === 'boolean' ? forceState : !state.hyperlinks;
-  state.hyperlinks = next;
-  elements.hyperlinkButton.setAttribute('aria-pressed', String(next));
-  if (next) {
-    updateLinkOverlay(state.note);
-    if (!state.note.trim()) {
-      elements.linkOverlay.style.display = 'none';
-      elements.linkOverlay.classList.remove('active');
-      elements.linkOverlay.setAttribute('aria-hidden', 'true');
-    }
-  } else {
-    elements.linkOverlay.classList.remove('active');
-    elements.linkOverlay.innerHTML = '';
-    elements.linkOverlay.style.display = 'none';
-    elements.linkOverlay.setAttribute('aria-hidden', 'true');
-  }
-  if (!options.skipSave) {
-    scheduleSave({ hyperlinks: state.hyperlinks });
-  }
-}
-
-function setCompactMode(forceState, options = {}) {
-  const next = typeof forceState === 'boolean' ? forceState : !state.compactMode;
-  state.compactMode = next;
-  elements.toolbar.classList.toggle('toolbar-compact', next);
-  elements.compactButton.setAttribute('aria-pressed', String(next));
-  if (!options.skipSave) {
-    scheduleSave({ compactMode: state.compactMode });
+    closeThemePanel();
   }
 }
 
@@ -365,50 +358,6 @@ function insertEmoji(emoji) {
   handleNoteChange({ target: elements.noteArea });
 }
 
-function updateLinkOverlay(text) {
-  if (!state.hyperlinks) {
-    elements.linkOverlay.classList.remove('active');
-    elements.linkOverlay.style.display = 'none';
-    elements.linkOverlay.setAttribute('aria-hidden', 'true');
-    return;
-  }
-  if (!text.trim()) {
-    elements.linkOverlay.innerHTML = '';
-    elements.linkOverlay.classList.remove('active');
-    elements.linkOverlay.style.display = 'none';
-    elements.linkOverlay.setAttribute('aria-hidden', 'true');
-    return;
-  }
-  const escaped = escapeHTML(text);
-  const linked = escaped.replace(urlRegex, match => {
-    const href = match.startsWith('http') ? match : `https://${match}`;
-    return `<a href=\"${href}\" target=\"_blank\" rel=\"noopener noreferrer\">${match}</a>`;
-  });
-  elements.linkOverlay.innerHTML = linked;
-  elements.linkOverlay.classList.add('active');
-  elements.linkOverlay.style.display = 'block';
-  elements.linkOverlay.setAttribute('aria-hidden', 'false');
-  syncOverlayScroll();
-}
-
-const urlRegex = /\b((?:https?:\/\/)|(?:www\.))[^\s<]+/gi;
-
-function escapeHTML(value) {
-  const map = {
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  };
-  return value.replace(/[&<>"']/g, char => map[char]);
-}
-
-function syncOverlayScroll() {
-  elements.linkOverlay.scrollTop = elements.noteArea.scrollTop;
-  elements.linkOverlay.scrollLeft = elements.noteArea.scrollLeft;
-}
-
 function handleDocumentClick(event) {
   if (isConfirmationOpen()) {
     return;
@@ -422,12 +371,72 @@ function handleDocumentClick(event) {
     elements.emojiButton.setAttribute('aria-expanded', 'false');
   }
   if (
-    !elements.colorPickerPanel.classList.contains('hidden') &&
-    !elements.colorPickerPanel.contains(event.target) &&
-    !(elements.colorButton && elements.colorButton.contains(event.target))
+    elements.themePanel &&
+    !elements.themePanel.classList.contains('hidden') &&
+    !elements.themePanel.contains(event.target) &&
+    event.target !== elements.themeButton
   ) {
-    colorPicker.hide();
+    closeThemePanel();
   }
+}
+
+function startResize(event) {
+  if (!elements.resizeHandle) {
+    return;
+  }
+  if (event.button !== 0 && event.pointerType === 'mouse') {
+    return;
+  }
+  const style = getComputedStyle(document.documentElement);
+  const startWidth = parseFloat(style.getPropertyValue('--popup-width')) || document.documentElement.clientWidth;
+  const startHeight = parseFloat(style.getPropertyValue('--popup-height')) || document.documentElement.clientHeight;
+  resizeSession = {
+    pointerId: event.pointerId,
+    startX: event.screenX,
+    startY: event.screenY,
+    startWidth,
+    startHeight
+  };
+  elements.resizeHandle.setPointerCapture?.(event.pointerId);
+  document.addEventListener('pointermove', handleResizeMove);
+  document.addEventListener('pointerup', endResize, { once: true });
+  document.addEventListener('pointercancel', endResize, { once: true });
+  event.preventDefault();
+}
+
+function handleResizeMove(event) {
+  if (!resizeSession || (resizeSession.pointerId !== undefined && event.pointerId !== resizeSession.pointerId)) {
+    return;
+  }
+  const deltaX = event.screenX - resizeSession.startX;
+  const deltaY = event.screenY - resizeSession.startY;
+  const targetWidth = Math.min(
+    RESIZE_MAX_WIDTH,
+    Math.max(RESIZE_MIN_WIDTH, resizeSession.startWidth + deltaX)
+  );
+  const targetHeight = Math.min(
+    RESIZE_MAX_HEIGHT,
+    Math.max(RESIZE_MIN_HEIGHT, resizeSession.startHeight + deltaY)
+  );
+  document.documentElement.style.setProperty('--popup-width', `${Math.round(targetWidth)}px`);
+  document.documentElement.style.setProperty('--popup-height', `${Math.round(targetHeight)}px`);
+  document.body.style.width = '100%';
+  document.body.style.height = '100%';
+  event.preventDefault();
+}
+
+function endResize(event) {
+  if (!resizeSession) {
+    return;
+  }
+  if (elements.resizeHandle) {
+    elements.resizeHandle.releasePointerCapture?.(resizeSession.pointerId);
+  }
+  document.removeEventListener('pointermove', handleResizeMove);
+  document.removeEventListener('pointercancel', endResize);
+  document.removeEventListener('pointerup', endResize);
+  resizeSession = null;
+  event.preventDefault();
 }
 
 function handleKeyDown(event) {
@@ -447,21 +456,10 @@ function handleKeyDown(event) {
       elements.emojiPanel.classList.add('hidden');
       elements.emojiButton.setAttribute('aria-expanded', 'false');
     }
-    colorPicker.hide();
+    if (elements.themePanel && !elements.themePanel.classList.contains('hidden')) {
+      closeThemePanel();
+    }
   }
-}
-
-function applyBackgroundColor(color) {
-  const hsl = `hsl(${color.h} ${color.s}% ${color.l}%)`;
-  const isDark = Boolean(state.darkMode);
-  const background = isDark ? '#000000' : hsl;
-  elements.noteArea.style.backgroundColor = background;
-  elements.linkOverlay.style.backgroundColor = background;
-  if (elements.noteContainer) {
-    elements.noteContainer.style.backgroundColor = isDark ? '#000000' : '';
-  }
-  elements.currentHex.textContent = isDark ? '#000000' : color.hex;
-  updateNoteContrast();
 }
 
 function clearStoredData() {
@@ -485,27 +483,6 @@ function clearStoredData() {
       }
     }
   });
-}
-
-function updateNoteContrast() {
-  if (!elements.noteArea || !elements.linkOverlay) {
-    return;
-  }
-  const lightness = Number(state.backgroundColor?.l);
-  const isDarkBackground = state.darkMode || (Number.isFinite(lightness) ? lightness < 55 : false);
-  const textColor = isDarkBackground ? NOTE_TEXT_DARK : NOTE_TEXT_LIGHT;
-  const selectionBg = isDarkBackground ? NOTE_SELECTION_DARK : NOTE_SELECTION_LIGHT;
-  const selectionText = isDarkBackground ? NOTE_SELECTION_TEXT_DARK : NOTE_SELECTION_TEXT_LIGHT;
-
-  elements.noteArea.style.setProperty('--note-text-color', textColor);
-  elements.noteArea.style.setProperty('--note-text-highlight', textColor);
-  elements.noteArea.style.setProperty('--note-selection-bg', selectionBg);
-  elements.noteArea.style.setProperty('--note-selection-text', selectionText);
-  elements.noteArea.style.color = textColor;
-  elements.noteArea.style.caretColor = isDarkBackground ? textColor : 'auto';
-
-  elements.linkOverlay.style.setProperty('--note-text-color', textColor);
-  elements.linkOverlay.style.color = textColor;
 }
 
 async function updateStorageUsage() {
@@ -551,43 +528,14 @@ function formatBytes(bytes) {
   return `${value.toFixed(precision)} ${units[unitIndex]}`;
 }
 
-function toggleColorPickerFromButton() {
-  if (!elements.colorPickerPanel) {
-    return;
-  }
-  const opening = elements.colorPickerPanel.classList.contains('hidden');
-  if (elements.colorButton) {
-    elements.colorButton.setAttribute('aria-pressed', String(opening));
-  }
-  if (elements.fontPanel && !elements.fontPanel.classList.contains('hidden')) {
-    elements.fontPanel.classList.add('hidden');
-    elements.fontButton.setAttribute('aria-expanded', 'false');
-  }
-  if (elements.emojiPanel && !elements.emojiPanel.classList.contains('hidden')) {
-    elements.emojiPanel.classList.add('hidden');
-    elements.emojiButton.setAttribute('aria-expanded', 'false');
-  }
-  const anchor = elements.colorButton
-    ? (() => {
-        const rect = elements.colorButton.getBoundingClientRect();
-        return {
-          x: rect.left + rect.width / 2,
-          y: rect.bottom + 12
-        };
-      })()
-    : undefined;
-  colorPicker.toggle({ anchor });
-}
-
 function performClearNote() {
   elements.noteArea.value = '';
   state.note = '';
   scheduleSave({ note: state.note });
-  updateLinkOverlay('');
   elements.noteArea.focus();
 }
 
-function showConfirmation({ message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', onConfirm }) {
+function showConfirmation({ message, confirmLabel = 'Confirm', cancelLabel = 'Cancel', onConfirm, includeDontAsk = false }) {
   if (!elements.confirmOverlay || !elements.confirmMessage || !elements.confirmAcceptButton || !elements.confirmCancelButton) {
     if (typeof onConfirm === 'function') {
       onConfirm();
@@ -605,6 +553,10 @@ function showConfirmation({ message, confirmLabel = 'Confirm', cancelLabel = 'Ca
   elements.confirmMessage.textContent = message;
   elements.confirmAcceptButton.textContent = confirmLabel;
   elements.confirmCancelButton.textContent = cancelLabel;
+  if (elements.confirmDontAskCheckbox) {
+    elements.confirmDontAskCheckbox.checked = false;
+    elements.confirmDontAskCheckbox.parentElement.classList.toggle('hidden', !includeDontAsk);
+  }
   elements.confirmOverlay.classList.remove('hidden');
   elements.confirmOverlay.setAttribute('aria-hidden', 'false');
 
@@ -619,9 +571,14 @@ function resolveConfirmation(accepted) {
     return;
   }
   const action = pendingConfirmation?.onConfirm ?? null;
+  const dontAsk = Boolean(elements.confirmDontAskCheckbox?.checked);
   pendingConfirmation = null;
   hideConfirmation();
   if (accepted && typeof action === 'function') {
+    if (dontAsk) {
+      state.suppressClearConfirm = true;
+      scheduleSave({ suppressClearConfirm: true });
+    }
     Promise.resolve()
       .then(action)
       .catch(error => {
