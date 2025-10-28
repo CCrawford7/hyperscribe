@@ -15,11 +15,15 @@
 <body>
   <div id="app" class="theme-light">
     <header id="toolbar" class="toolbar toolbar-expanded" aria-label="Quick Notepad toolbar">
+      <button id="settingsButton" class="toolbar-btn" type="button" data-short="SET" data-tooltip="Toolbar settings" aria-label="Toolbar settings" aria-controls="settingsPanel" aria-expanded="false">
+        <i class="codicon codicon-settings-gear" aria-hidden="true"></i>
+        <span class="label">Settings</span>
+      </button>
       <button id="copyButton" class="toolbar-btn" type="button" data-short="CPY" data-tooltip="Copy note" aria-label="Copy note">
         <i class="codicon codicon-copy" aria-hidden="true"></i>
         <span class="label">Copy</span>
       </button>
-      <button id="searchButton" class="toolbar-btn" type="button" data-short="FND" data-tooltip="Search notes" aria-label="Search notes">
+      <button id="searchButton" class="toolbar-btn" type="button" data-short="FND" data-tooltip="Search notes" aria-label="Search notes" data-toolbar-action="search">
         <i class="codicon codicon-search" aria-hidden="true"></i>
         <span class="label">Find</span>
       </button>
@@ -27,19 +31,19 @@
         <i class="codicon codicon-clear-all" aria-hidden="true"></i>
         <span class="label">Clear</span>
       </button>
-      <button id="themeButton" class="toolbar-btn" type="button" data-short="THM" data-tooltip="Change theme" aria-expanded="false" aria-controls="themePanel">
+      <button id="themeButton" class="toolbar-btn" type="button" data-short="THM" data-tooltip="Change theme" aria-expanded="false" aria-controls="themePanel" data-toolbar-action="themes">
         <i class="codicon codicon-symbol-color" aria-hidden="true"></i>
         <span class="label">Themes</span>
       </button>
-      <button id="fontButton" class="toolbar-btn" type="button" data-short="FONT" data-tooltip="Font controls" aria-expanded="false" aria-controls="fontPanel">
+      <button id="fontButton" class="toolbar-btn" type="button" data-short="FONT" data-tooltip="Font controls" aria-expanded="false" aria-controls="fontPanel" data-toolbar-action="fonts">
         <i class="codicon codicon-text-size" aria-hidden="true"></i>
         <span class="label">Fonts</span>
       </button>
-      <button id="previewButton" class="toolbar-btn" type="button" data-short="MD" data-tooltip="Toggle markdown preview" aria-label="Toggle markdown preview">
+      <button id="previewButton" class="toolbar-btn" type="button" data-short="MD" data-tooltip="Toggle markdown preview" aria-label="Toggle markdown preview" data-toolbar-action="preview">
         <i class="codicon codicon-preview" aria-hidden="true"></i>
         <span class="label">Preview</span>
       </button>
-      <button id="emojiButton" class="toolbar-btn" type="button" data-short="INS" data-tooltip="Insert symbols" aria-expanded="false" aria-controls="emojiPanel">
+      <button id="emojiButton" class="toolbar-btn" type="button" data-short="INS" data-tooltip="Insert symbols" aria-expanded="false" aria-controls="emojiPanel" data-toolbar-action="insert">
         <i class="codicon codicon-symbol-namespace" aria-hidden="true"></i>
         <span class="label">Insert</span>
       </button>
@@ -48,6 +52,81 @@
         <span class="label">Export</span>
       </button>
     </header>
+
+    <section id="settingsPanel" class="panel hidden settings-panel" aria-label="Toolbar customization" aria-hidden="true">
+      <div class="settings-section">
+        <h2 class="settings-heading">Pinned icons</h2>
+        <p class="settings-description">Choose which extras stay visible on the toolbar.</p>
+        <div class="settings-options">
+          <label class="settings-toggle">
+            <input type="checkbox" data-toolbar-toggle="search">
+            <span>Find &amp; replace</span>
+          </label>
+          <label class="settings-toggle">
+            <input type="checkbox" data-toolbar-toggle="preview">
+            <span>Markdown preview</span>
+          </label>
+          <label class="settings-toggle">
+            <input type="checkbox" data-toolbar-toggle="insert">
+            <span>Insert symbols</span>
+          </label>
+          <label class="settings-toggle">
+            <input type="checkbox" data-toolbar-toggle="themes">
+            <span>Theme presets</span>
+          </label>
+          <label class="settings-toggle">
+            <input type="checkbox" data-toolbar-toggle="fonts">
+            <span>Font controls</span>
+          </label>
+        </div>
+      </div>
+      <div class="settings-section">
+        <h2 class="settings-heading">Layout</h2>
+        <div class="settings-options layout">
+          <label class="settings-radio">
+            <input type="radio" name="toolbarDensity" value="comfortable">
+            <span>Comfortable</span>
+          </label>
+          <label class="settings-radio">
+            <input type="radio" name="toolbarDensity" value="compact">
+            <span>Compact</span>
+          </label>
+          <label class="settings-toggle inline">
+            <input type="checkbox" id="toolbarLabelsToggle">
+            <span>Show text labels</span>
+          </label>
+        </div>
+      </div>
+      <div class="settings-section quick-tools">
+        <h2 class="settings-heading">Quick tools</h2>
+        <div class="quick-action-grid">
+          <button type="button" class="settings-quick-btn" data-settings-action="search">
+            <i class="codicon codicon-search" aria-hidden="true"></i>
+            <span>Find note</span>
+          </button>
+          <button type="button" class="settings-quick-btn" data-settings-action="preview">
+            <i class="codicon codicon-preview" aria-hidden="true"></i>
+            <span>Split preview</span>
+          </button>
+          <button type="button" class="settings-quick-btn" data-settings-action="insert">
+            <i class="codicon codicon-symbol-namespace" aria-hidden="true"></i>
+            <span>Insert symbols</span>
+          </button>
+          <button type="button" class="settings-quick-btn" data-settings-action="themes">
+            <i class="codicon codicon-symbol-color" aria-hidden="true"></i>
+            <span>Theme presets</span>
+          </button>
+          <button type="button" class="settings-quick-btn" data-settings-action="fonts">
+            <i class="codicon codicon-text-size" aria-hidden="true"></i>
+            <span>Font controls</span>
+          </button>
+          <button type="button" class="settings-quick-btn" data-settings-action="detach">
+            <i class="codicon codicon-window" aria-hidden="true"></i>
+            <span>Pop-out window</span>
+          </button>
+        </div>
+      </div>
+    </section>
 
     <section id="themePanel" class="panel hidden theme-panel" aria-label="Theme presets" aria-hidden="true">
       <div class="theme-grid">
@@ -173,6 +252,24 @@
           <span>Don't ask again</span>
         </label>
       </div>
+    </div>
+    <div id="downloadDialog" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="downloadDialogTitle">
+      <form id="downloadForm" class="modal-panel download-panel">
+        <h2 id="downloadDialogTitle" class="modal-title">Export note</h2>
+        <label for="downloadFilenameInput" class="modal-label">File name</label>
+        <input id="downloadFilenameInput" type="text" class="modal-input" name="filename" autocomplete="off" spellcheck="false" required>
+        <p class="modal-hint">Unsupported characters are removed automatically. If no extension is provided, .txt will be used.</p>
+        <div class="modal-actions">
+          <button id="downloadCancelButton" type="button" class="status-btn" data-tooltip="Cancel export">
+            <i class="codicon codicon-discard" aria-hidden="true"></i>
+            <span class="label">Cancel</span>
+          </button>
+          <button type="submit" class="status-btn confirm" data-tooltip="Download note">
+            <i class="codicon codicon-save" aria-hidden="true"></i>
+            <span class="label">Download</span>
+          </button>
+        </div>
+      </form>
     </div>
     <button id="closePopupButton" class="close-dot" type="button" aria-label="Close Quick Notepad"></button>
     <div id="resizeHandle" class="resize-handle" role="presentation" aria-hidden="true"></div>

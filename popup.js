@@ -16,6 +16,8 @@ const storageKey = 'quickNotepadState';
 const elements = {
   app: document.getElementById('app'),
   toolbar: document.getElementById('toolbar'),
+  settingsButton: document.getElementById('settingsButton'),
+  settingsPanel: document.getElementById('settingsPanel'),
   copyButton: document.getElementById('copyButton'),
   searchButton: document.getElementById('searchButton'),
   clearNoteButton: document.getElementById('clearNoteButton'),
@@ -25,6 +27,11 @@ const elements = {
   previewButton: document.getElementById('previewButton'),
   emojiButton: document.getElementById('emojiButton'),
   downloadButton: document.getElementById('downloadButton'),
+  downloadDialog: document.getElementById('downloadDialog'),
+  downloadForm: document.getElementById('downloadForm'),
+  downloadFilenameInput: document.getElementById('downloadFilenameInput'),
+  downloadCancelButton: document.getElementById('downloadCancelButton'),
+  toolbarLabelsToggle: document.getElementById('toolbarLabelsToggle'),
   fontPanel: document.getElementById('fontPanel'),
   fontSizeControl: document.getElementById('fontSizeControl'),
   fontSizeValue: document.getElementById('fontSizeValue'),
@@ -62,6 +69,17 @@ const elements = {
 };
 
 const themeChipButtons = Array.from(document.querySelectorAll('.theme-chip'));
+const OPTIONAL_ACTIONS = [
+  { id: 'search', elementKey: 'searchButton' },
+  { id: 'preview', elementKey: 'previewButton' },
+  { id: 'insert', elementKey: 'emojiButton' },
+  { id: 'themes', elementKey: 'themeButton' },
+  { id: 'fonts', elementKey: 'fontButton' }
+];
+const OPTIONAL_ACTION_IDS = new Set(OPTIONAL_ACTIONS.map(action => action.id));
+const toolbarToggleControls = Array.from(document.querySelectorAll('[data-toolbar-toggle]'));
+const toolbarDensityControls = Array.from(document.querySelectorAll('input[name="toolbarDensity"]'));
+const settingsQuickActionButtons = Array.from(document.querySelectorAll('[data-settings-action]'));
 
 const emojiList = [
   '😀', '😁', '😂', '🤣', '😊', '😍', '🤓', '😎', '🤩', '🥳',
@@ -74,6 +92,16 @@ const defaultState = {
   note: '',
   theme: 'default_bright',
   suppressClearConfirm: false,
+  downloadFilename: 'quick-note.txt',
+  panelSize: {
+    width: 360,
+    height: 420
+  },
+  toolbarPreferences: {
+    visibleOptionalActions: ['search'],
+    density: 'compact',
+    showLabels: false
+  },
   font: {
     size: 16,
     family: 'Inter, sans-serif',
@@ -86,11 +114,19 @@ let state = structuredClone(defaultState);
 let saveTimer = null;
 let pendingConfirmation = null;
 let confirmationRestoreTarget = null;
+let downloadDialogRestoreTarget = null;
 const RESIZE_MIN_WIDTH = 320;
 const RESIZE_MIN_HEIGHT = 360;
 const RESIZE_MAX_WIDTH = 640;
 const RESIZE_MAX_HEIGHT = 720;
 let resizeSession = null;
+
+function clamp(value, min, max) {
+  if (!Number.isFinite(value)) {
+    return min;
+  }
+  return Math.min(Math.max(value, min), max);
+}
 
 function resolveThemeId(storedState) {
   if (storedState && typeof storedState.theme === 'string' && storedState.theme in THEMES) {
@@ -199,13 +235,248 @@ async function hydrateState() {
 function applyStateToUI() {
   elements.noteArea.value = state.note;
 
+  applyPanelSize(state.panelSize);
   setTheme(state.theme, { skipSave: true });
+  applyToolbarPreferences(state.toolbarPreferences);
 
   fontManager.apply(state.font);
   markdownPreview.updatePreview();
 }
 
+function applyPanelSize(size) {
+  const fallback = defaultState.panelSize;
+  const width = clamp(Number(size?.width) || fallback.width, RESIZE_MIN_WIDTH, RESIZE_MAX_WIDTH);
+  const height = clamp(Number(size?.height) || fallback.height, RESIZE_MIN_HEIGHT, RESIZE_MAX_HEIGHT);
+  document.documentElement.style.setProperty('--popup-width', `${Math.round(width)}px`);
+  document.documentElement.style.setProperty('--popup-height', `${Math.round(height)}px`);
+  document.body.style.width = '100%';
+  document.body.style.height = '100%';
+  state.panelSize = { width: Math.round(width), height: Math.round(height) };
+}
+
+function normalizeToolbarPreferences(preferences = {}) {
+  const defaults = defaultState.toolbarPreferences;
+  const rawVisible = Array.isArray(preferences.visibleOptionalActions) ? preferences.visibleOptionalActions : defaults.visibleOptionalActions;
+  const visibleOptionalActions = Array.from(new Set(rawVisible.filter(actionId => OPTIONAL_ACTION_IDS.has(actionId))));
+  const density = preferences.density === 'compact' ? 'compact' : 'comfortable';
+  const showLabels = typeof preferences.showLabels === 'boolean' ? preferences.showLabels : defaults.showLabels;
+  return {
+    visibleOptionalActions,
+    density,
+    showLabels
+  };
+}
+
+function applyToolbarPreferences(preferences = {}) {
+  const prefs = normalizeToolbarPreferences(preferences);
+  state.toolbarPreferences = prefs;
+
+  if (elements.toolbar) {
+    elements.toolbar.classList.toggle('toolbar--comfortable', prefs.density === 'comfortable');
+    elements.toolbar.classList.toggle('toolbar--compact', prefs.density === 'compact');
+    elements.toolbar.classList.toggle('toolbar--labels-off', !prefs.showLabels);
+  }
+
+  OPTIONAL_ACTIONS.forEach(({ id, elementKey }) => {
+    const button = elements[elementKey];
+    if (!button) {
+      return;
+    }
+    const visible = prefs.visibleOptionalActions.includes(id);
+    button.classList.toggle('is-hidden', !visible);
+    button.setAttribute('aria-hidden', String(!visible));
+    if (visible) {
+      button.removeAttribute('tabindex');
+    } else {
+      button.setAttribute('tabindex', '-1');
+    }
+  });
+
+  syncToolbarControls();
+}
+
+function syncToolbarControls() {
+  const prefs = state.toolbarPreferences ?? defaultState.toolbarPreferences;
+  toolbarToggleControls.forEach(control => {
+    const actionId = control.dataset.toolbarToggle;
+    if (!actionId) {
+      return;
+    }
+    control.checked = prefs.visibleOptionalActions.includes(actionId);
+  });
+  toolbarDensityControls.forEach(control => {
+    if (!(control instanceof HTMLInputElement)) {
+      return;
+    }
+    control.checked = control.value === prefs.density;
+  });
+  if (elements.toolbarLabelsToggle instanceof HTMLInputElement) {
+    elements.toolbarLabelsToggle.checked = prefs.showLabels;
+  }
+}
+
+function toggleSettingsPanel() {
+  if (!elements.settingsButton || !elements.settingsPanel) {
+    return;
+  }
+  const isExpanded = elements.settingsButton.getAttribute('aria-expanded') === 'true';
+  const next = !isExpanded;
+  elements.settingsButton.setAttribute('aria-expanded', String(next));
+  elements.settingsPanel.classList.toggle('hidden', !next);
+  elements.settingsPanel.setAttribute('aria-hidden', String(!next));
+  if (next) {
+    closeThemePanel();
+    closeFontPanel();
+    elements.emojiPanel?.classList.add('hidden');
+    elements.emojiButton?.setAttribute('aria-expanded', 'false');
+  }
+}
+
+function closeSettingsPanel() {
+  if (!elements.settingsButton || !elements.settingsPanel) {
+    return;
+  }
+  elements.settingsButton.setAttribute('aria-expanded', 'false');
+  elements.settingsPanel.classList.add('hidden');
+  elements.settingsPanel.setAttribute('aria-hidden', 'true');
+}
+
+function isSettingsPanelOpen() {
+  return Boolean(elements.settingsPanel && !elements.settingsPanel.classList.contains('hidden'));
+}
+
+function handleToolbarToggleChange(event) {
+  const control = event.currentTarget;
+  if (!(control instanceof HTMLInputElement)) {
+    return;
+  }
+  const actionId = control.dataset.toolbarToggle;
+  if (!OPTIONAL_ACTION_IDS.has(actionId)) {
+    return;
+  }
+  const prefs = normalizeToolbarPreferences(state.toolbarPreferences);
+  const nextVisible = new Set(prefs.visibleOptionalActions);
+  if (control.checked) {
+    nextVisible.add(actionId);
+  } else {
+    nextVisible.delete(actionId);
+  }
+  const updated = {
+    ...prefs,
+    visibleOptionalActions: Array.from(nextVisible)
+  };
+  state.toolbarPreferences = updated;
+  applyToolbarPreferences(updated);
+  scheduleSave({ toolbarPreferences: updated });
+}
+
+function handleToolbarDensityChange(event) {
+  const control = event.currentTarget;
+  if (!(control instanceof HTMLInputElement) || !control.checked) {
+    return;
+  }
+  const density = control.value === 'compact' ? 'compact' : 'comfortable';
+  const prefs = normalizeToolbarPreferences(state.toolbarPreferences);
+  const updated = { ...prefs, density };
+  state.toolbarPreferences = updated;
+  applyToolbarPreferences(updated);
+  scheduleSave({ toolbarPreferences: updated });
+}
+
+function handleToolbarLabelsChange(event) {
+  if (!(event.currentTarget instanceof HTMLInputElement)) {
+    return;
+  }
+  const prefs = normalizeToolbarPreferences(state.toolbarPreferences);
+  const updated = { ...prefs, showLabels: Boolean(event.currentTarget.checked) };
+  state.toolbarPreferences = updated;
+  applyToolbarPreferences(updated);
+  scheduleSave({ toolbarPreferences: updated });
+}
+
+function handleSettingsQuickAction(event) {
+  const button = event.currentTarget;
+  if (!(button instanceof HTMLButtonElement)) {
+    return;
+  }
+  const action = button.dataset.settingsAction;
+  if (!action) {
+    return;
+  }
+  closeSettingsPanel();
+  switch (action) {
+    case 'search':
+      searchManager.open(false);
+      break;
+    case 'preview':
+      previewMode = previewMode === 'split' ? 'edit' : 'split';
+      markdownPreview.setMode(previewMode);
+      updatePreviewButtonState(previewMode);
+      break;
+    case 'insert':
+      closeFontPanel();
+      closeThemePanel();
+      elements.emojiPanel?.classList.remove('hidden');
+      elements.emojiPanel?.setAttribute('aria-hidden', 'false');
+      elements.emojiButton?.setAttribute('aria-expanded', 'true');
+      break;
+    case 'themes':
+      if (elements.themePanel?.classList.contains('hidden')) {
+        toggleThemePanel();
+        focusActiveThemeChip();
+      } else {
+        focusActiveThemeChip();
+      }
+      break;
+    case 'fonts':
+      if (elements.fontPanel?.classList.contains('hidden')) {
+        toggleFontPanel();
+      }
+      elements.fontSizeControl?.focus();
+      break;
+    case 'detach':
+      openDetachedWindow();
+      break;
+    default:
+      break;
+  }
+}
+
+async function openDetachedWindow() {
+  const url = chrome?.runtime?.getURL ? chrome.runtime.getURL('popup.html') : null;
+  if (!url) {
+    return;
+  }
+  const { width, height } = state.panelSize ?? defaultState.panelSize;
+  const popupWidth = Math.round(clamp(width, RESIZE_MIN_WIDTH, RESIZE_MAX_WIDTH));
+  const popupHeight = Math.round(clamp(height, RESIZE_MIN_HEIGHT, RESIZE_MAX_HEIGHT));
+  const createOptions = {
+    url,
+    type: 'popup',
+    width: popupWidth,
+    height: popupHeight,
+    focused: true
+  };
+  if (chrome?.windows?.create) {
+    try {
+      await chrome.windows.create(createOptions);
+      return;
+    } catch (error) {
+      console.warn('Quick Notepad: unable to open detached window', error);
+    }
+  }
+  if (chrome?.tabs?.create) {
+    try {
+      await chrome.tabs.create({ url });
+    } catch (error) {
+      console.warn('Quick Notepad: unable to open fallback tab', error);
+    }
+  }
+}
+
+
 function bindEvents() {
+  elements.settingsButton?.addEventListener('click', toggleSettingsPanel);
   elements.copyButton.addEventListener('click', copyAll);
   elements.searchButton?.addEventListener('click', () => toggleSearchBar(false));
   elements.clearNoteButton.addEventListener('click', clearNote);
@@ -216,7 +487,23 @@ function bindEvents() {
   elements.fontButton.addEventListener('click', toggleFontPanel);
   elements.previewButton?.addEventListener('click', togglePreviewMode);
   elements.emojiButton.addEventListener('click', toggleEmojiPanel);
-  elements.downloadButton.addEventListener('click', downloadNote);
+  elements.downloadButton.addEventListener('click', handleDownloadRequest);
+  toolbarToggleControls.forEach(control => {
+    control.addEventListener('change', handleToolbarToggleChange);
+  });
+  toolbarDensityControls.forEach(control => {
+    control.addEventListener('change', handleToolbarDensityChange);
+  });
+  elements.toolbarLabelsToggle?.addEventListener('change', handleToolbarLabelsChange);
+  settingsQuickActionButtons.forEach(button => {
+    button.addEventListener('click', handleSettingsQuickAction);
+  });
+  elements.downloadForm?.addEventListener('submit', handleDownloadSubmit);
+  elements.downloadCancelButton?.addEventListener('click', event => {
+    event.preventDefault();
+    closeDownloadDialog();
+  });
+  elements.downloadDialog?.addEventListener('click', handleDownloadDialogClick);
   elements.clearStorageButton.addEventListener('click', clearStoredData);
   elements.noteArea.addEventListener('input', handleNoteChange);
   elements.closePopupButton?.addEventListener('click', () => window.close());
@@ -273,10 +560,9 @@ function toggleThemePanel() {
   elements.themePanel.classList.toggle('hidden', !next);
   elements.themePanel.setAttribute('aria-hidden', String(!next));
   if (next) {
-    elements.fontPanel.classList.add('hidden');
-    elements.fontButton.setAttribute('aria-expanded', 'false');
-    elements.emojiPanel.classList.add('hidden');
-    elements.emojiButton.setAttribute('aria-expanded', 'false');
+    closeFontPanel();
+    closeSettingsPanel();
+    closeEmojiPanel();
     focusActiveThemeChip();
   } else {
     elements.themeButton.focus();
@@ -290,6 +576,24 @@ function closeThemePanel() {
   elements.themePanel.classList.add('hidden');
   elements.themePanel.setAttribute('aria-hidden', 'true');
   elements.themeButton?.setAttribute('aria-expanded', 'false');
+}
+
+function closeFontPanel() {
+  if (!elements.fontPanel || !elements.fontButton) {
+    return;
+  }
+  elements.fontPanel.classList.add('hidden');
+  elements.fontPanel.setAttribute('aria-hidden', 'true');
+  elements.fontButton.setAttribute('aria-expanded', 'false');
+}
+
+function closeEmojiPanel() {
+  if (!elements.emojiPanel || !elements.emojiButton) {
+    return;
+  }
+  elements.emojiPanel.classList.add('hidden');
+  elements.emojiPanel.setAttribute('aria-hidden', 'true');
+  elements.emojiButton.setAttribute('aria-expanded', 'false');
 }
 
 function handleThemeSelection(themeId) {
@@ -373,15 +677,102 @@ function clearNote() {
   performClearNote();
 }
 
-function downloadNote() {
-  const now = new Date();
-  const day = String(now.getDate()).padStart(2, '0');
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const year = String(now.getFullYear());
-  const filename = `hyprscr-${day}-${month}-${year}.txt`;
-  downloadAsText(filename, elements.noteArea.value).catch(error => {
+function handleDownloadRequest() {
+  closeSettingsPanel();
+  if (!elements.downloadDialog || !elements.downloadFilenameInput) {
+    performDownload(state.downloadFilename ?? defaultState.downloadFilename);
+    return;
+  }
+  openDownloadDialog();
+}
+
+function handleDownloadSubmit(event) {
+  event.preventDefault();
+  if (!elements.downloadFilenameInput) {
+    performDownload(defaultState.downloadFilename);
+    return;
+  }
+  const rawValue = elements.downloadFilenameInput.value ?? '';
+  const filename = normalizeDownloadFilename(rawValue);
+  if (!filename) {
+    elements.downloadFilenameInput.setCustomValidity('Please enter a filename.');
+    elements.downloadFilenameInput.reportValidity();
+    return;
+  }
+  elements.downloadFilenameInput.setCustomValidity('');
+  state.downloadFilename = filename;
+  scheduleSave({ downloadFilename: filename });
+  closeDownloadDialog();
+  performDownload(filename);
+}
+
+function performDownload(filename) {
+  const finalName = ensureTextExtension(filename);
+  downloadAsText(finalName, elements.noteArea.value).catch(error => {
     console.warn('Quick Notepad: download failed', error);
   });
+}
+
+function openDownloadDialog() {
+  if (!elements.downloadDialog || !elements.downloadFilenameInput) {
+    return;
+  }
+  const defaultName = state.downloadFilename ?? defaultState.downloadFilename;
+  elements.downloadFilenameInput.value = defaultName;
+  elements.downloadDialog.classList.remove('hidden');
+  elements.downloadDialog.setAttribute('aria-hidden', 'false');
+  downloadDialogRestoreTarget = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  requestAnimationFrame(() => {
+    elements.downloadFilenameInput.focus();
+    elements.downloadFilenameInput.select();
+  });
+}
+
+function closeDownloadDialog() {
+  if (!elements.downloadDialog) {
+    return;
+  }
+  elements.downloadDialog.classList.add('hidden');
+  elements.downloadDialog.setAttribute('aria-hidden', 'true');
+  if (downloadDialogRestoreTarget && typeof downloadDialogRestoreTarget.focus === 'function') {
+    downloadDialogRestoreTarget.focus();
+  }
+  downloadDialogRestoreTarget = null;
+}
+
+function isDownloadDialogOpen() {
+  return Boolean(elements.downloadDialog && !elements.downloadDialog.classList.contains('hidden'));
+}
+
+function handleDownloadDialogClick(event) {
+  if (!elements.downloadDialog) {
+    return;
+  }
+  if (event.target === elements.downloadDialog) {
+    closeDownloadDialog();
+  }
+}
+
+function ensureTextExtension(filename) {
+  if (/\.[^.\\/:*?"<>|]+$/.test(filename.trim())) {
+    return filename.trim();
+  }
+  return `${filename.trim()}.txt`;
+}
+
+function normalizeDownloadFilename(value) {
+  if (!value) {
+    return defaultState.downloadFilename;
+  }
+  const cleaned = value
+    .replace(/[\u0000-\u001f<>:"/\\|?*]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) {
+    return defaultState.downloadFilename;
+  }
+  const truncated = cleaned.length > 80 ? cleaned.slice(0, 80).trim() : cleaned;
+  return truncated;
 }
 
 function setTheme(themeId, options = {}) {
@@ -421,10 +812,11 @@ function toggleFontPanel() {
   const next = !isExpanded;
   elements.fontButton.setAttribute('aria-expanded', String(next));
   elements.fontPanel.classList.toggle('hidden', !next);
+  elements.fontPanel.setAttribute('aria-hidden', String(!next));
   if (next) {
-    elements.emojiPanel.classList.add('hidden');
-    elements.emojiButton.setAttribute('aria-expanded', 'false');
+    closeEmojiPanel();
     closeThemePanel();
+    closeSettingsPanel();
   }
 }
 
@@ -433,10 +825,11 @@ function toggleEmojiPanel() {
   const next = !isExpanded;
   elements.emojiButton.setAttribute('aria-expanded', String(next));
   elements.emojiPanel.classList.toggle('hidden', !next);
+  elements.emojiPanel.setAttribute('aria-hidden', String(!next));
   if (next) {
-    elements.fontPanel.classList.add('hidden');
-    elements.fontButton.setAttribute('aria-expanded', 'false');
+    closeFontPanel();
     closeThemePanel();
+    closeSettingsPanel();
   }
 }
 
@@ -456,13 +849,22 @@ function handleDocumentClick(event) {
   if (isConfirmationOpen()) {
     return;
   }
-  if (!elements.fontPanel.classList.contains('hidden') && !elements.fontPanel.contains(event.target) && event.target !== elements.fontButton) {
-    elements.fontPanel.classList.add('hidden');
-    elements.fontButton.setAttribute('aria-expanded', 'false');
+  if (isDownloadDialogOpen()) {
+    return;
   }
-  if (!elements.emojiPanel.classList.contains('hidden') && !elements.emojiPanel.contains(event.target) && event.target !== elements.emojiButton) {
-    elements.emojiPanel.classList.add('hidden');
-    elements.emojiButton.setAttribute('aria-expanded', 'false');
+  if (
+    isSettingsPanelOpen() &&
+    elements.settingsPanel &&
+    !elements.settingsPanel.contains(event.target) &&
+    event.target !== elements.settingsButton
+  ) {
+    closeSettingsPanel();
+  }
+  if (elements.fontPanel && !elements.fontPanel.classList.contains('hidden') && !elements.fontPanel.contains(event.target) && event.target !== elements.fontButton) {
+    closeFontPanel();
+  }
+  if (elements.emojiPanel && !elements.emojiPanel.classList.contains('hidden') && !elements.emojiPanel.contains(event.target) && event.target !== elements.emojiButton) {
+    closeEmojiPanel();
   }
   if (
     elements.themePanel &&
@@ -504,14 +906,8 @@ function handleResizeMove(event) {
   }
   const deltaX = event.screenX - resizeSession.startX;
   const deltaY = event.screenY - resizeSession.startY;
-  const targetWidth = Math.min(
-    RESIZE_MAX_WIDTH,
-    Math.max(RESIZE_MIN_WIDTH, resizeSession.startWidth + deltaX)
-  );
-  const targetHeight = Math.min(
-    RESIZE_MAX_HEIGHT,
-    Math.max(RESIZE_MIN_HEIGHT, resizeSession.startHeight + deltaY)
-  );
+  const targetWidth = clamp(resizeSession.startWidth - deltaX, RESIZE_MIN_WIDTH, RESIZE_MAX_WIDTH);
+  const targetHeight = clamp(resizeSession.startHeight + deltaY, RESIZE_MIN_HEIGHT, RESIZE_MAX_HEIGHT);
   document.documentElement.style.setProperty('--popup-width', `${Math.round(targetWidth)}px`);
   document.documentElement.style.setProperty('--popup-height', `${Math.round(targetHeight)}px`);
   document.body.style.width = '100%';
@@ -529,6 +925,17 @@ function endResize(event) {
   document.removeEventListener('pointermove', handleResizeMove);
   document.removeEventListener('pointercancel', endResize);
   document.removeEventListener('pointerup', endResize);
+  const style = getComputedStyle(document.documentElement);
+  const widthValue = parseFloat(style.getPropertyValue('--popup-width')) || document.documentElement.clientWidth;
+  const heightValue = parseFloat(style.getPropertyValue('--popup-height')) || document.documentElement.clientHeight;
+  const width = Math.round(clamp(widthValue, RESIZE_MIN_WIDTH, RESIZE_MAX_WIDTH));
+  const height = Math.round(clamp(heightValue, RESIZE_MIN_HEIGHT, RESIZE_MAX_HEIGHT));
+  const prevWidth = Math.round(state.panelSize?.width ?? 0);
+  const prevHeight = Math.round(state.panelSize?.height ?? 0);
+  if (width !== prevWidth || height !== prevHeight) {
+    state.panelSize = { width, height };
+    scheduleSave({ panelSize: state.panelSize });
+  }
   resizeSession = null;
   event.preventDefault();
 }
@@ -537,6 +944,20 @@ function handleKeyDown(event) {
   if (isConfirmationOpen()) {
     if (event.key === 'Escape') {
       resolveConfirmation(false);
+      event.preventDefault();
+    }
+    return;
+  }
+  if (isDownloadDialogOpen()) {
+    if (event.key === 'Escape') {
+      closeDownloadDialog();
+      event.preventDefault();
+    }
+    return;
+  }
+  if (isSettingsPanelOpen()) {
+    if (event.key === 'Escape') {
+      closeSettingsPanel();
       event.preventDefault();
     }
     return;

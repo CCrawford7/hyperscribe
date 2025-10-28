@@ -3,6 +3,16 @@ const storageKey = 'quickNotepadState';
 const defaultState = {
   note: '',
   theme: 'default_bright',
+  downloadFilename: 'quick-note.txt',
+  panelSize: {
+    width: 360,
+    height: 420
+  },
+  toolbarPreferences: {
+    visibleOptionalActions: ['search'],
+    density: 'compact',
+    showLabels: false
+  },
   font: {
     size: 16,
     family: 'Inter, sans-serif',

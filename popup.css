@@ -66,6 +66,8 @@ body {
   background: var(--light-bg);
   color: var(--light-text);
   letter-spacing: 0.01em;
+  display: flex;
+  flex-direction: column;
 }
 
 body.theme-dark {
@@ -84,6 +86,8 @@ body.theme-light {
   display: flex;
   flex-direction: column;
   min-height: 100%;
+  height: 100%;
+  flex: 1 1 auto;
   width: 100%;
   padding: 12px;
   gap: 12px;
@@ -120,6 +124,30 @@ body.theme-light {
   --note-container-bg: radial-gradient(circle at top left, rgba(255, 255, 255, 0.85), rgba(223, 228, 242, 0.9));
   --note-container-border: var(--light-border);
   --note-container-shadow: var(--shadow-light);
+}
+
+.theme-default-bright {
+  --light-bg: #d4d0c8;
+  --light-panel: #ebe7de;
+  --light-border: #958f86;
+  --light-text: #1d1c1a;
+  --light-subtle: rgba(29, 28, 26, 0.6);
+  --shadow-light: 0 0 0 1px rgba(58, 58, 58, 0.25);
+  --accent-primary: #0a64c0;
+  --accent-muted: rgba(10, 100, 192, 0.2);
+  --accent-muted-strong: rgba(10, 100, 192, 0.32);
+  --tooltip-bg: rgba(32, 32, 32, 0.92);
+  --tooltip-text: #f5f5f5;
+  --note-container-bg: linear-gradient(135deg, rgba(236, 231, 222, 0.95), rgba(209, 203, 195, 0.95));
+  --note-container-border: rgba(149, 143, 134, 0.9);
+  --status-bg: #ebe7de;
+  --status-border: var(--light-border);
+  --confirm-panel-bg: #f0ece4;
+  --confirm-panel-border: var(--light-border);
+  --note-selection-bg: rgba(10, 100, 192, 0.18);
+  --note-selection-text: var(--light-text);
+  --placeholder-color: rgba(35, 35, 35, 0.6);
+  --overlay-backdrop: rgba(32, 32, 32, 0.45);
 }
 
 .theme-monokai {
@@ -194,10 +222,12 @@ body.theme-light {
 .toolbar {
   display: flex;
   flex-wrap: nowrap;
-  justify-content: center;
-  gap: 2px;
+  justify-content: flex-start;
+  gap: 4px;
   padding: 4px;
   align-items: center;
+  overflow-x: auto;
+  flex: 0 0 auto;
   border: 1px solid var(--light-border);
   background: var(--light-panel);
   box-shadow: var(--shadow-light);
@@ -208,6 +238,7 @@ body.theme-light {
   background: var(--dark-panel);
   box-shadow: var(--shadow-dark);
 }
+
 
 .toolbar-btn,
 .toggle-btn,
@@ -230,9 +261,60 @@ body.theme-light {
   transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
   position: relative;
   flex: 0 0 auto;
-  min-width: auto;
-  width: 34px;
-  height: 34px;
+  min-width: 40px;
+  height: 40px;
+}
+
+.toolbar-btn {
+  padding: 4px 6px;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+}
+
+.toolbar-btn .codicon {
+  font-size: 1rem;
+}
+
+.toolbar-btn.is-hidden {
+  display: none !important;
+}
+
+.toolbar--labels-off .toolbar-btn .label,
+.toolbar--labels-off .toggle-btn .label {
+  display: none;
+}
+
+.toolbar--labels-off .toolbar-btn {
+  gap: 0;
+  height: 36px;
+  padding: 4px;
+}
+
+.toolbar--comfortable .toolbar-btn {
+  min-width: 56px;
+  height: 50px;
+  padding: 6px 10px;
+  gap: 8px;
+}
+
+.toolbar--comfortable .toolbar-btn .codicon {
+  font-size: 1.25rem;
+}
+
+.toolbar--compact .toolbar-btn {
+  min-width: 34px;
+  height: 36px;
+  padding: 3px;
+  gap: 2px;
+  font-size: 0.6rem;
+}
+
+.toolbar--compact .toolbar-btn .codicon {
+  font-size: 0.95rem;
 }
 
 .toolbar-btn:hover,
@@ -263,9 +345,11 @@ body.theme-light {
 
 .toolbar-btn .label,
 .toggle-btn .label {
-  display: none;
+  display: inline;
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
-
 
 .toolbar-btn .codicon,
 .toggle-btn .codicon,
@@ -387,6 +471,109 @@ body.theme-light {
   gap: 12px;
 }
 
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-heading {
+  margin: 0;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.settings-description {
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: var(--placeholder-color);
+}
+
+.settings-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.settings-options.layout {
+  align-items: center;
+  gap: 10px 16px;
+}
+
+.settings-toggle,
+.settings-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.settings-toggle input,
+.settings-radio input {
+  accent-color: var(--accent-primary);
+}
+
+.settings-toggle.inline {
+  margin-left: auto;
+}
+
+.quick-action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.settings-quick-btn {
+  border: 1px solid currentColor;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: inherit;
+  padding: 8px 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.settings-quick-btn:hover,
+.settings-quick-btn:focus-visible {
+  background: var(--accent-muted);
+  color: var(--accent-primary);
+  border-color: var(--accent-primary);
+  outline: none;
+}
+
+.settings-quick-btn .codicon {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.theme-dark .settings-description {
+  color: var(--dark-subtle);
+}
+
+.theme-dark .settings-quick-btn:hover,
+.theme-dark .settings-quick-btn:focus-visible {
+  background: rgba(51, 255, 128, 0.16);
+  color: var(--accent-primary);
+}
+
 .theme-panel .theme-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
@@ -422,8 +609,8 @@ body.theme-light {
 }
 
 .theme-panel .theme-swatch.theme-swatch-bright {
-  background: linear-gradient(135deg, #f6f9ff, #dbe4f2);
-  border-color: #8899b5;
+  background: linear-gradient(135deg, #f2ede3, #d4d0c8);
+  border-color: #958f86;
 }
 
 .theme-panel .theme-swatch.theme-swatch-dark {
@@ -568,6 +755,16 @@ body.theme-light {
   background: rgba(6, 22, 12, 0.85);
 }
 
+.theme-dark .modal-input {
+  background: rgba(6, 26, 12, 0.88);
+  border-color: var(--dark-border);
+  color: var(--dark-text);
+}
+
+.theme-dark .modal-hint {
+  color: var(--dark-subtle);
+}
+
 .search-btn {
   border: 1px solid currentColor;
   border-radius: var(--border-radius);
@@ -641,9 +838,10 @@ body.theme-light {
 
 .note-container {
   position: relative;
-  flex: 1;
+  flex: 1 1 auto;
   display: flex;
   min-height: 220px;
+  min-width: 0;
   border: 1px solid var(--note-container-border);
   background: var(--note-container-bg);
   box-shadow: var(--note-container-shadow);
@@ -751,6 +949,71 @@ body.theme-light {
   gap: 12px;
 }
 
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--overlay-backdrop);
+  z-index: 60;
+}
+
+.modal-panel {
+  width: 100%;
+  max-width: 300px;
+  padding: 16px;
+  border: 1px solid var(--confirm-panel-border);
+  background: var(--confirm-panel-bg);
+  box-shadow: var(--confirm-panel-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.modal-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.modal-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--note-container-border);
+  background: var(--note-container-bg);
+  color: var(--note-text-color);
+  font-family: var(--font-family);
+  font-size: 0.9rem;
+  letter-spacing: 0.03em;
+}
+
+.modal-input:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.modal-hint {
+  margin: 0;
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+  color: var(--placeholder-color);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
 .confirm-message {
   margin: 0;
   font-size: 0.8rem;
@@ -851,10 +1114,10 @@ body.theme-light {
   right: 0;
   width: 20px;
   height: 20px;
-  background: linear-gradient(135deg, rgba(255, 214, 10, 0.9), rgba(255, 197, 0, 0.6));
+  background: linear-gradient(315deg, rgba(255, 214, 10, 0.9), rgba(255, 197, 0, 0.6));
   border: 1px solid rgba(255, 214, 10, 0.9);
   border-radius: 0;
-  cursor: nesw-resize;
+  cursor: nwse-resize;
   opacity: 0.9;
   transition: opacity var(--transition-fast), box-shadow var(--transition-fast);
   box-shadow: 0 0 6px rgba(0, 0, 0, 0.25);
