@@ -421,7 +421,7 @@ function handleTemplateSelect(templateId) {
     elements.noteArea.focus();
     announce('Template applied');
   } catch (error) {
-    console.warn('Quick Notepad: failed to apply template', error);
+    console.warn('Hyperscribe: failed to apply template', error);
     announce('Unable to insert template', 'assertive');
   }
 }
@@ -432,7 +432,7 @@ async function loadCustomTemplates() {
     const customTemplates = result.customTemplates || [];
     templateManager.loadCustomTemplates(customTemplates);
   } catch (error) {
-    console.warn('Quick Notepad: failed to load custom templates', error);
+    console.warn('Hyperscribe: failed to load custom templates', error);
   }
 }
 
@@ -441,13 +441,13 @@ async function saveCustomTemplates() {
     const customTemplates = templateManager.getCustomTemplates();
     await chrome.storage.local.set({ customTemplates });
   } catch (error) {
-    console.warn('Quick Notepad: failed to save custom templates', error);
+    console.warn('Hyperscribe: failed to save custom templates', error);
   }
 }
 
 function openTemplateDialog() {
   if (!elements.templateDialog) {
-    console.warn('Quick Notepad: templateDialog element not found');
+    console.warn('Hyperscribe: templateDialog element not found');
     return;
   }
 
@@ -488,7 +488,7 @@ function closeTemplateDialog() {
 
 async function handleSaveTemplate() {
   if (!elements.templateNameInput || !elements.templateContentInput) {
-    console.warn('Quick Notepad: template form elements not found');
+    console.warn('Hyperscribe: template form elements not found');
     return;
   }
 
@@ -524,7 +524,7 @@ async function handleSaveTemplate() {
     closeTemplateDialog();
     announce(`Template "${name}" created`);
   } catch (error) {
-    console.warn('Quick Notepad: failed to create template', error);
+    console.warn('Hyperscribe: failed to create template', error);
     announce(error.message || 'Failed to create template', 'assertive');
   }
 }
@@ -548,7 +548,7 @@ async function handleDeleteTemplate(templateId) {
       announce(`Template "${template.name}" deleted`);
     }
   } catch (error) {
-    console.warn('Quick Notepad: failed to delete template', error);
+    console.warn('Hyperscribe: failed to delete template', error);
     announce(error.message || 'Failed to delete template', 'assertive');
   }
 }
@@ -842,7 +842,7 @@ function exportNote(format, { silent = false } = {}) {
       }
     },
     error => {
-      console.warn('Quick Notepad: export failed', error);
+      console.warn('Hyperscribe: export failed', error);
       announce('Failed to download note', 'assertive');
     }
   );
@@ -876,7 +876,7 @@ function fallbackCopy(text) {
     document.execCommand('copy');
     announce('Formatted note copied to clipboard');
   } catch (error) {
-    console.warn('Quick Notepad: clipboard copy failed', error);
+    console.warn('Hyperscribe: clipboard copy failed', error);
     announce('Unable to copy formatted note', 'assertive');
   }
   document.body.removeChild(temp);
@@ -978,11 +978,11 @@ function handleExportSettings() {
     download(filename, JSON.stringify(data, null, 2), 'json')
       .then(() => announce('Settings exported'))
       .catch(error => {
-        console.warn('Quick Notepad: settings export failed', error);
+        console.warn('Hyperscribe: settings export failed', error);
         announce('Failed to export settings', 'assertive');
       });
   } catch (error) {
-    console.warn('Quick Notepad: settings export threw', error);
+    console.warn('Hyperscribe: settings export threw', error);
     announce('Failed to export settings', 'assertive');
   }
 }
@@ -1010,7 +1010,7 @@ function handleImportSettings(event) {
         announce(result.message || 'Unable to import settings', 'assertive');
       }
     } catch (error) {
-      console.warn('Quick Notepad: settings import failed', error);
+      console.warn('Hyperscribe: settings import failed', error);
       announce('Invalid or corrupted settings file', 'assertive');
     } finally {
       if (input) {
@@ -1020,7 +1020,7 @@ function handleImportSettings(event) {
   };
 
   reader.onerror = () => {
-    console.warn('Quick Notepad: failed to read settings file');
+    console.warn('Hyperscribe: failed to read settings file');
     announce('Unable to read settings file', 'assertive');
     if (input) {
       input.value = '';
@@ -1527,7 +1527,7 @@ function deriveNoteTitle(content, state) {
 
   const text = content || state.note || '';
   const firstLine = text.split('\n')[0].trim();
-  return firstLine || 'Quick Notepad';
+  return firstLine || 'Hyperscribe';
 }
 
 function getActiveNoteState(state) {
@@ -1886,7 +1886,7 @@ async function copyAll() {
     }
     announce('Note copied to clipboard');
   } catch (error) {
-    console.warn('Quick Notepad: copy failed', error);
+    console.warn('Hyperscribe: copy failed', error);
     announce('Failed to copy note', 'assertive');
   }
 }
@@ -1940,7 +1940,7 @@ function insertEmoji(emoji) {
 
 function clearStoredData() {
   confirmationDialog.show({
-    message: 'Reset all saved Quick Notepad data including note contents and preferences?',
+    message: 'Reset all saved Hyperscribe data including note contents and preferences?',
     confirmLabel: 'Clear Data',
     onConfirm: async () => {
       await stateManager.clear();

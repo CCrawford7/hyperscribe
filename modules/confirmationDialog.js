@@ -126,7 +126,7 @@ export default class ConfirmationDialog {
       Promise.resolve()
         .then(() => action(context))
         .catch(error => {
-          console.warn('Quick Notepad: confirmation action failed', error);
+          console.warn('Hyperscribe: confirmation action failed', error);
         });
     }
   }
