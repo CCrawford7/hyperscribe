@@ -1,130 +1,635 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Quick Notepad</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://microsoft.github.io/vscode-codicons/dist/codicon.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Roboto:wght@400;700&family=Merriweather:wght@400;700&family=Space+Mono:wght@400;700&family=Fira+Code:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="popup.css">
-</head>
-<body>
-  <div id="app" class="theme-light">
-    <header id="toolbar" class="toolbar toolbar-expanded" aria-label="Quick Notepad toolbar">
-      <button id="copyButton" class="toolbar-btn" type="button" data-short="CPY" data-tooltip="Copy note" aria-label="Copy note">
-        <i class="codicon codicon-copy" aria-hidden="true"></i>
-        <span class="label">Copy</span>
-      </button>
-      <button id="clearNoteButton" class="toolbar-btn" type="button" data-short="CLR" data-tooltip="Clear note text" aria-label="Clear note text">
-        <i class="codicon codicon-clear-all" aria-hidden="true"></i>
-        <span class="label">Clear</span>
-      </button>
-      <button id="themeButton" class="toolbar-btn" type="button" data-short="THM" data-tooltip="Change theme" aria-expanded="false" aria-controls="themePanel">
-        <i class="codicon codicon-symbol-color" aria-hidden="true"></i>
-        <span class="label">Themes</span>
-      </button>
-      <button id="fontButton" class="toolbar-btn" type="button" data-short="FONT" data-tooltip="Font controls" aria-expanded="false" aria-controls="fontPanel">
-        <i class="codicon codicon-text-size" aria-hidden="true"></i>
-        <span class="label">Fonts</span>
-      </button>
-      <button id="emojiButton" class="toolbar-btn" type="button" data-short="INS" data-tooltip="Insert symbols" aria-expanded="false" aria-controls="emojiPanel">
-        <i class="codicon codicon-symbol-namespace" aria-hidden="true"></i>
-        <span class="label">Insert</span>
-      </button>
-      <button id="downloadButton" class="toolbar-btn" type="button" data-short="SAVE" data-tooltip="Download as .txt" aria-label="Download as .txt">
-        <i class="codicon codicon-save" aria-hidden="true"></i>
-        <span class="label">Export</span>
-      </button>
-    </header>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Quick Notepad</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://microsoft.github.io/vscode-codicons/dist/codicon.css" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Roboto:wght@400;700&family=Merriweather:wght@400;700&family=Space+Mono:wght@400;700&family=Fira+Code:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <!-- ARIA live regions for screen reader announcements -->
+    <div id="ariaLivePolite" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+    <div id="ariaLiveAssertive" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
 
-    <section id="themePanel" class="panel hidden theme-panel" aria-label="Theme presets" aria-hidden="true">
-      <div class="theme-grid">
-        <button type="button" class="theme-chip" data-theme="default_bright" aria-pressed="false">
-          <span class="theme-swatch theme-swatch-bright" aria-hidden="true"></span>
-          <span class="theme-name">Default Bright</span>
-        </button>
-        <button type="button" class="theme-chip" data-theme="default_dark" aria-pressed="false">
-          <span class="theme-swatch theme-swatch-dark" aria-hidden="true"></span>
-          <span class="theme-name">Default Dark</span>
-        </button>
-        <button type="button" class="theme-chip" data-theme="monokai" aria-pressed="false">
-          <span class="theme-swatch theme-swatch-monokai" aria-hidden="true"></span>
-          <span class="theme-name">Monokai</span>
-        </button>
-        <button type="button" class="theme-chip" data-theme="nord" aria-pressed="false">
-          <span class="theme-swatch theme-swatch-nord" aria-hidden="true"></span>
-          <span class="theme-name">Nord</span>
-        </button>
-        <button type="button" class="theme-chip" data-theme="dracula" aria-pressed="false">
-          <span class="theme-swatch theme-swatch-dracula" aria-hidden="true"></span>
-          <span class="theme-name">Dracula</span>
-        </button>
-      </div>
-    </section>
-
-    <section id="fontPanel" class="panel hidden" aria-label="Font settings">
-      <div class="panel-row">
-        <label for="fontSizeControl">Font Size</label>
-        <input id="fontSizeControl" type="range" min="12" max="32" step="1">
-        <span id="fontSizeValue" class="value-tag">16px</span>
-      </div>
-      <div class="panel-row">
-        <label for="fontFamilySelect">Font Family</label>
-        <select id="fontFamilySelect">
-          <option value="Inter, sans-serif">Inter</option>
-          <option value="Roboto, sans-serif">Roboto</option>
-          <option value="Merriweather, serif">Merriweather</option>
-          <option value="Space Mono, monospace">Space Mono</option>
-          <option value="Fira Code, monospace">Fira Code</option>
-          <option value="Georgia, serif">Georgia</option>
-        </select>
-      </div>
-      <div class="panel-row toggles">
-        <button id="boldToggle" type="button" class="toggle-btn" aria-pressed="false">Bold</button>
-        <button id="italicToggle" type="button" class="toggle-btn" aria-pressed="false">Italic</button>
-      </div>
-    </section>
-
-    <section id="emojiPanel" class="panel hidden" aria-label="Emoji picker">
-      <div id="emojiGrid" class="emoji-grid" role="grid" aria-live="polite"></div>
-    </section>
-
-    <div class="note-container">
-      <textarea id="noteArea" placeholder="Type your note..." aria-label="Note text area" autofocus spellcheck="false"></textarea>
-    </div>
-
-    <footer class="status-bar">
-      <span id="storageUsage" class="storage-usage" aria-live="polite">Storage: --</span>
-      <button id="clearStorageButton" type="button" class="status-btn icon-only" data-tooltip="Reset saved note and preferences" aria-label="Clear saved data">
-        <i class="codicon codicon-database" aria-hidden="true"></i>
-      </button>
-    </footer>
-
-    <div id="confirmOverlay" class="confirm-overlay hidden" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="confirmMessage">
-      <div class="confirm-panel">
-        <p id="confirmMessage" class="confirm-message">Confirm action?</p>
-        <div class="confirm-actions">
-          <button id="confirmCancelButton" type="button" class="status-btn" data-tooltip="Cancel action">
-            <i class="codicon codicon-discard" aria-hidden="true"></i>
-            <span class="label">Cancel</span>
+    <div id="app" class="theme-light">
+      <main>
+        <header
+          id="toolbar"
+          class="toolbar toolbar-expanded"
+          role="toolbar"
+          aria-label="Quick Notepad toolbar"
+        >
+          <button
+            id="copyButton"
+            class="toolbar-btn toolbar-btn-primary"
+            type="button"
+            data-short="CPY"
+            data-tooltip="Copy note"
+            aria-label="Copy note"
+          >
+            <i class="codicon codicon-copy" aria-hidden="true"></i>
+            <span class="label">Copy</span>
           </button>
-          <button id="confirmAcceptButton" type="button" class="status-btn confirm" data-tooltip="Proceed with action">
-            <i class="codicon codicon-check" aria-hidden="true"></i>
-            <span class="label">Confirm</span>
+          <button
+            id="clearNoteButton"
+            class="toolbar-btn toolbar-btn-primary"
+            type="button"
+            data-short="CLR"
+            data-tooltip="Clear note text"
+            aria-label="Clear note text"
+          >
+            <i class="codicon codicon-clear-all" aria-hidden="true"></i>
+            <span class="label">Clear</span>
+          </button>
+          <button
+            id="themeButton"
+            class="toolbar-btn toolbar-btn-collapsible"
+            type="button"
+            data-short="THM"
+            data-tooltip="Change theme"
+            aria-expanded="false"
+            aria-controls="themePanel"
+          >
+            <i class="codicon codicon-symbol-color" aria-hidden="true"></i>
+            <span class="label">Themes</span>
+          </button>
+          <button
+            id="fontButton"
+            class="toolbar-btn toolbar-btn-collapsible"
+            type="button"
+            data-short="FONT"
+            data-tooltip="Font controls"
+            aria-expanded="false"
+            aria-controls="fontPanel"
+          >
+            <i class="codicon codicon-text-size" aria-hidden="true"></i>
+            <span class="label">Fonts</span>
+          </button>
+          <button
+            id="emojiButton"
+            class="toolbar-btn toolbar-btn-collapsible"
+            type="button"
+            data-short="INS"
+            data-tooltip="Insert symbols"
+            aria-expanded="false"
+            aria-controls="emojiPanel"
+            aria-label="Insert emoji or symbol"
+          >
+            <i class="codicon codicon-symbol-namespace" aria-hidden="true"></i>
+            <span class="label">Insert</span>
+          </button>
+          <div class="export-dropdown">
+            <button
+              id="downloadButton"
+              class="toolbar-btn toolbar-btn-primary"
+              type="button"
+              data-short="SAVE"
+              data-tooltip="Export note"
+              aria-label="Export note"
+              aria-expanded="false"
+              aria-controls="exportMenu"
+            >
+              <i class="codicon codicon-save" aria-hidden="true"></i>
+              <span class="label">Export</span>
+            </button>
+            <div id="exportMenu" class="export-menu hidden" role="menu" aria-hidden="true">
+              <button type="button" class="export-option" data-format="txt" role="menuitem">
+                <i class="codicon codicon-file-text" aria-hidden="true"></i>
+                <span>Download as TXT</span>
+              </button>
+              <button type="button" class="export-option" data-format="md" role="menuitem">
+                <i class="codicon codicon-markdown" aria-hidden="true"></i>
+                <span>Download as Markdown</span>
+              </button>
+              <button type="button" class="export-option" data-format="html" role="menuitem">
+                <i class="codicon codicon-browser" aria-hidden="true"></i>
+                <span>Download as HTML</span>
+              </button>
+              <div class="export-divider" role="separator"></div>
+              <button type="button" class="export-option" id="copyFormattedButton" role="menuitem">
+                <i class="codicon codicon-clippy" aria-hidden="true"></i>
+                <span>Copy as Formatted</span>
+              </button>
+            </div>
+          </div>
+          <button
+            id="moreButton"
+            class="toolbar-btn"
+            type="button"
+            data-tooltip="More tools"
+            aria-label="More tools"
+            aria-expanded="false"
+            aria-controls="moreMenu"
+            style="display: none"
+          >
+            <i class="codicon codicon-three-bars" aria-hidden="true"></i>
+            <span class="label">More</span>
+          </button>
+          <div id="moreMenu" class="more-menu hidden" role="menu" aria-hidden="true">
+            <!-- Buttons will be dynamically populated by JavaScript -->
+          </div>
+          <button
+            id="templateButton"
+            class="toolbar-btn toolbar-btn-collapsible"
+            type="button"
+            data-short="TMPL"
+            data-tooltip="Insert template"
+            aria-expanded="false"
+            aria-controls="templatePanel"
+          >
+            <i class="codicon codicon-file-code" aria-hidden="true"></i>
+            <span class="label">Templates</span>
+          </button>
+          <button
+            id="syncButton"
+            class="toolbar-btn toolbar-btn-collapsible"
+            type="button"
+            data-short="SYNC"
+            data-tooltip="Sync settings"
+            aria-expanded="false"
+            aria-controls="syncPanel"
+          >
+            <i class="codicon codicon-sync" aria-hidden="true"></i>
+            <span class="label">Sync</span>
+          </button>
+        </header>
+      </main>
+
+      <section
+        id="themePanel"
+        class="panel hidden theme-panel"
+        aria-label="Theme presets"
+        aria-hidden="true"
+      >
+        <div class="theme-grid">
+          <button type="button" class="theme-chip" data-theme="default_bright" aria-pressed="false">
+            <span class="theme-swatch theme-swatch-bright" aria-hidden="true"></span>
+            <span class="theme-name">Default Bright</span>
+          </button>
+          <button type="button" class="theme-chip" data-theme="default_dark" aria-pressed="false">
+            <span class="theme-swatch theme-swatch-dark" aria-hidden="true"></span>
+            <span class="theme-name">Default Dark</span>
+          </button>
+          <button type="button" class="theme-chip" data-theme="monokai" aria-pressed="false">
+            <span class="theme-swatch theme-swatch-monokai" aria-hidden="true"></span>
+            <span class="theme-name">Monokai</span>
+          </button>
+          <button type="button" class="theme-chip" data-theme="nord" aria-pressed="false">
+            <span class="theme-swatch theme-swatch-nord" aria-hidden="true"></span>
+            <span class="theme-name">Nord</span>
+          </button>
+          <button type="button" class="theme-chip" data-theme="dracula" aria-pressed="false">
+            <span class="theme-swatch theme-swatch-dracula" aria-hidden="true"></span>
+            <span class="theme-name">Dracula</span>
           </button>
         </div>
-        <label class="confirm-checkbox">
-          <input id="confirmDontAskCheckbox" type="checkbox">
-          <span>Don't ask again</span>
-        </label>
-      </div>
-    </div>
-    <button id="closePopupButton" class="close-dot" type="button" aria-label="Close Quick Notepad"></button>
-    <div id="resizeHandle" class="resize-handle" role="presentation" aria-hidden="true"></div>
-  </div>
+      </section>
 
-  <script type="module" src="popup.js"></script>
-</body>
+      <section id="fontPanel" class="panel hidden" aria-label="Font settings" aria-hidden="true">
+        <div class="panel-row">
+          <label for="fontSizeControl">Font Size</label>
+          <input
+            id="fontSizeControl"
+            type="range"
+            min="12"
+            max="32"
+            step="1"
+            aria-describedby="fontSizeValue"
+            aria-label="Adjust font size from 12 to 32 pixels"
+          />
+          <span id="fontSizeValue" class="value-tag" aria-live="polite">16px</span>
+        </div>
+        <div class="panel-row">
+          <label for="fontFamilySelect">Font Family</label>
+          <select id="fontFamilySelect" aria-label="Select font family">
+            <option value="Inter, sans-serif">Inter</option>
+            <option value="Roboto, sans-serif">Roboto</option>
+            <option value="Merriweather, serif">Merriweather</option>
+            <option value="Space Mono, monospace">Space Mono</option>
+            <option value="Fira Code, monospace">Fira Code</option>
+            <option value="Georgia, serif">Georgia</option>
+          </select>
+        </div>
+        <div class="panel-row toggles">
+          <button id="boldToggle" type="button" class="toggle-btn" aria-pressed="false">
+            Bold
+          </button>
+          <button id="italicToggle" type="button" class="toggle-btn" aria-pressed="false">
+            Italic
+          </button>
+        </div>
+      </section>
+
+      <section id="emojiPanel" class="panel hidden" aria-label="Emoji picker" aria-hidden="true">
+        <div id="emojiGrid" class="emoji-grid" role="grid" aria-label="Emoji selection grid"></div>
+      </section>
+
+      <section
+        id="templatePanel"
+        class="panel hidden template-panel"
+        aria-label="Template picker"
+        aria-hidden="true"
+      >
+        <div class="template-panel-header">
+          <button
+            id="createTemplateButton"
+            type="button"
+            class="status-btn"
+            data-tooltip="Create custom template"
+            aria-label="Create custom template"
+          >
+            <i class="codicon codicon-add" aria-hidden="true"></i>
+            <span class="label">New Template</span>
+          </button>
+        </div>
+        <div id="templateGrid" class="template-grid"></div>
+      </section>
+
+      <section
+        id="syncPanel"
+        class="panel hidden sync-panel"
+        aria-label="Sync settings"
+        aria-hidden="true"
+      >
+        <div class="panel-row">
+          <label for="syncToggle" class="sync-toggle-label">Enable Sync</label>
+          <label class="toggle-switch">
+            <input id="syncToggle" type="checkbox" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="sync-info">
+          <p class="sync-description">
+            Sync your notes across devices (Chrome account required). Maximum 100KB total storage.
+          </p>
+        </div>
+        <div class="panel-row">
+          <span class="sync-status-label">Status:</span>
+          <span id="syncStatus" class="sync-status">Disabled</span>
+        </div>
+        <div id="syncLastSyncRow" class="panel-row hidden">
+          <span class="sync-status-label">Last synced:</span>
+          <span id="syncLastSync" class="sync-last-sync">Never</span>
+        </div>
+        <div id="syncUsageRow" class="panel-row hidden">
+          <span class="sync-status-label">Storage used:</span>
+          <span id="syncUsage" class="sync-usage">0 B / 100 KB</span>
+        </div>
+        <div class="sync-actions">
+          <button id="syncNowButton" type="button" class="status-btn" disabled>
+            <i class="codicon codicon-sync" aria-hidden="true"></i>
+            <span class="label">Sync Now</span>
+          </button>
+          <button id="clearSyncButton" type="button" class="status-btn">
+            <i class="codicon codicon-trash" aria-hidden="true"></i>
+            <span class="label">Clear Sync Data</span>
+          </button>
+        </div>
+        <div class="sync-divider"></div>
+        <div class="sync-browse-section">
+          <button id="browseSyncedNotesButton" type="button" class="status-btn" disabled>
+            <i class="codicon codicon-cloud-download" aria-hidden="true"></i>
+            <span class="label">Browse Synced Notes</span>
+          </button>
+          <div id="syncedNotesBrowser" class="synced-notes-browser hidden">
+            <div class="synced-notes-header">
+              <span class="synced-notes-title">Cloud Storage</span>
+              <button
+                id="closeSyncedNotesBrowser"
+                type="button"
+                class="icon-btn"
+                aria-label="Close browser"
+              >
+                <i class="codicon codicon-close" aria-hidden="true"></i>
+              </button>
+            </div>
+            <div id="syncedNotesContent" class="synced-notes-content">
+              <div class="synced-note-item">
+                <div class="synced-note-info">
+                  <div class="synced-note-preview" id="syncedNotePreview">No synced note found</div>
+                  <div class="synced-note-meta">
+                    <span class="synced-note-date" id="syncedNoteDate"></span>
+                    <span class="synced-note-size" id="syncedNoteSize"></span>
+                  </div>
+                </div>
+                <div class="synced-note-actions">
+                  <button
+                    id="loadSyncedNoteButton"
+                    type="button"
+                    class="status-btn status-btn-primary"
+                    disabled
+                  >
+                    <i class="codicon codicon-arrow-down" aria-hidden="true"></i>
+                    <span class="label">Load Note</span>
+                  </button>
+                  <button
+                    id="previewSyncedNoteButton"
+                    type="button"
+                    class="icon-btn"
+                    disabled
+                    aria-label="Preview note"
+                  >
+                    <i class="codicon codicon-eye" aria-hidden="true"></i>
+                  </button>
+                </div>
+              </div>
+              <div id="syncedNotePreviewModal" class="synced-note-preview-modal hidden">
+                <div class="synced-note-preview-content">
+                  <div class="synced-note-preview-header">
+                    <span>Note Preview</span>
+                    <button
+                      id="closeSyncedNotePreview"
+                      type="button"
+                      class="icon-btn"
+                      aria-label="Close preview"
+                    >
+                      <i class="codicon codicon-close" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                  <div id="syncedNotePreviewText" class="synced-note-preview-text"></div>
+                </div>
+              </div>
+            </div>
+            <div class="sync-browser-status">
+              <span id="syncBrowserStatus" class="sync-browser-status-text"></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <nav id="noteTabs" class="note-tabs" role="tablist" aria-label="Note tabs">
+        <div id="noteTabList" class="note-tab-list"></div>
+        <button id="addNoteTab" type="button" class="note-tab-add" aria-label="Create new note">
+          <i class="codicon codicon-add" aria-hidden="true"></i>
+        </button>
+      </nav>
+
+      <article class="note-container">
+        <textarea
+          id="noteArea"
+          placeholder="Type your note..."
+          aria-label="Note text area"
+          autofocus
+          spellcheck="false"
+        ></textarea>
+      </article>
+
+      <footer class="status-bar" role="contentinfo">
+        <span id="wordCount" class="word-count" data-tooltip="Word and character count">--</span>
+        <span id="storageUsage" class="storage-usage" aria-live="polite">Storage: --</span>
+        <span id="saveIndicator" class="save-indicator hidden" aria-live="polite">
+          <i class="codicon codicon-loading codicon-modifier-spin" aria-hidden="true"></i>
+          <span class="save-indicator-text">Saving...</span>
+        </span>
+        <span
+          id="syncIndicator"
+          class="sync-indicator hidden"
+          aria-live="polite"
+          data-tooltip="Sync status"
+        >
+          <i class="codicon codicon-sync" aria-hidden="true"></i>
+        </span>
+        <button
+          id="exportSettingsButton"
+          type="button"
+          class="status-btn icon-only"
+          data-tooltip="Export settings (.json)"
+          aria-label="Export settings"
+        >
+          <i class="codicon codicon-cloud-upload" aria-hidden="true"></i>
+        </button>
+        <button
+          id="importSettingsButton"
+          type="button"
+          class="status-btn icon-only"
+          data-tooltip="Import settings (.json)"
+          aria-label="Import settings"
+        >
+          <i class="codicon codicon-cloud-download" aria-hidden="true"></i>
+        </button>
+        <input
+          id="importSettingsInput"
+          type="file"
+          accept="application/json"
+          class="sr-only"
+          hidden
+        />
+        <button
+          id="clearStorageButton"
+          type="button"
+          class="status-btn icon-only"
+          data-tooltip="Reset saved note and preferences"
+          aria-label="Clear saved data"
+        >
+          <i class="codicon codicon-database" aria-hidden="true"></i>
+        </button>
+      </footer>
+
+      <div
+        id="confirmOverlay"
+        class="confirm-overlay hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-hidden="true"
+        aria-labelledby="confirmMessage"
+      >
+        <div class="confirm-panel">
+          <p id="confirmMessage" class="confirm-message">Confirm action?</p>
+          <div class="confirm-actions">
+            <button
+              id="confirmCancelButton"
+              type="button"
+              class="status-btn"
+              data-tooltip="Cancel action"
+            >
+              <i class="codicon codicon-discard" aria-hidden="true"></i>
+              <span class="label">Cancel</span>
+            </button>
+            <button
+              id="confirmAcceptButton"
+              type="button"
+              class="status-btn confirm"
+              data-tooltip="Proceed with action"
+            >
+              <i class="codicon codicon-check" aria-hidden="true"></i>
+              <span class="label">Confirm</span>
+            </button>
+          </div>
+          <label class="confirm-checkbox">
+            <input id="confirmDontAskCheckbox" type="checkbox" />
+            <span>Don't ask again</span>
+          </label>
+        </div>
+      </div>
+
+      <div
+        id="conflictOverlay"
+        class="conflict-overlay hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-hidden="true"
+        aria-labelledby="conflictTitle"
+      >
+        <div class="conflict-panel">
+          <h3 id="conflictTitle" class="conflict-title">Sync Conflict Detected</h3>
+          <p class="conflict-message">
+            The note has been modified on multiple devices. Choose which version to keep:
+          </p>
+          <div class="conflict-navigation">
+            <button id="conflictPrev" type="button" class="icon-btn" aria-label="Previous conflict">
+              <i class="codicon codicon-chevron-left" aria-hidden="true"></i>
+            </button>
+            <span id="conflictCounter" class="conflict-counter">1 of 1</span>
+            <button id="conflictNext" type="button" class="icon-btn" aria-label="Next conflict">
+              <i class="codicon codicon-chevron-right" aria-hidden="true"></i>
+            </button>
+          </div>
+          <div class="conflict-versions">
+            <div class="conflict-version">
+              <h4 class="conflict-version-title">Local Version</h4>
+              <div id="conflictLocalPreview" class="conflict-preview"></div>
+              <span id="conflictLocalTime" class="conflict-timestamp"></span>
+            </div>
+            <div class="conflict-version">
+              <h4 class="conflict-version-title">Cloud Version</h4>
+              <div id="conflictCloudPreview" class="conflict-preview"></div>
+              <span id="conflictCloudTime" class="conflict-timestamp"></span>
+            </div>
+          </div>
+          <div class="conflict-actions">
+            <button id="conflictKeepLocal" type="button" class="status-btn">
+              <i class="codicon codicon-device-desktop" aria-hidden="true"></i>
+              <span class="label">Keep Local</span>
+            </button>
+            <button id="conflictKeepCloud" type="button" class="status-btn">
+              <i class="codicon codicon-cloud" aria-hidden="true"></i>
+              <span class="label">Keep Cloud</span>
+            </button>
+            <button id="conflictKeepBoth" type="button" class="status-btn">
+              <i class="codicon codicon-files" aria-hidden="true"></i>
+              <span class="label">Keep Both</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        id="templateDialog"
+        class="template-dialog-overlay hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-hidden="true"
+        aria-labelledby="templateDialogTitle"
+      >
+        <div class="template-dialog-panel">
+          <div class="template-dialog-header">
+            <h3 id="templateDialogTitle" class="template-dialog-title">Create Custom Template</h3>
+            <button
+              id="templateDialogClose"
+              type="button"
+              class="icon-btn"
+              aria-label="Close template dialog"
+            >
+              <i class="codicon codicon-close" aria-hidden="true"></i>
+            </button>
+          </div>
+          <div class="template-dialog-content">
+            <div class="template-dialog-row">
+              <label for="templateNameInput">Template Name <span class="required">*</span></label>
+              <input
+                id="templateNameInput"
+                type="text"
+                placeholder="My Template"
+                aria-label="Template name"
+                required
+              />
+            </div>
+            <div class="template-dialog-row">
+              <label for="templateIconInput">Icon (Emoji)</label>
+              <input
+                id="templateIconInput"
+                type="text"
+                placeholder="📄"
+                maxlength="2"
+                aria-label="Template icon"
+              />
+            </div>
+            <div class="template-dialog-row">
+              <label for="templateDescriptionInput">Description</label>
+              <input
+                id="templateDescriptionInput"
+                type="text"
+                placeholder="Brief description of template"
+                aria-label="Template description"
+              />
+            </div>
+            <div class="template-dialog-row template-dialog-row-full">
+              <label for="templateContentInput"
+                >Template Content <span class="required">*</span></label
+              >
+              <textarea
+                id="templateContentInput"
+                placeholder="Enter your template content here...&#10;&#10;Available variables:&#10;[DATE] - Current date (YYYY-MM-DD)&#10;[TIME] - Current time (HH:MM)&#10;[DATETIME] - Date and time&#10;[PROJECT_NAME] - Custom project name"
+                aria-label="Template content"
+                rows="8"
+                required
+              ></textarea>
+            </div>
+            <div class="template-dialog-hint">
+              <i class="codicon codicon-info" aria-hidden="true"></i>
+              <span>Use [DATE], [TIME], [DATETIME], [PROJECT_NAME] for dynamic values</span>
+            </div>
+          </div>
+          <div class="template-dialog-actions">
+            <button id="templateDialogCancel" type="button" class="status-btn">
+              <i class="codicon codicon-discard" aria-hidden="true"></i>
+              <span class="label">Cancel</span>
+            </button>
+            <button id="templateDialogSave" type="button" class="status-btn confirm">
+              <i class="codicon codicon-save" aria-hidden="true"></i>
+              <span class="label">Save Template</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        id="errorToast"
+        class="error-toast hidden"
+        role="alert"
+        aria-live="assertive"
+        aria-hidden="true"
+      >
+        <div class="error-toast-content">
+          <i class="codicon codicon-warning" aria-hidden="true"></i>
+          <span id="errorToastMessage" class="error-toast-message"></span>
+          <button
+            id="errorToastClose"
+            type="button"
+            class="error-toast-close"
+            aria-label="Dismiss error"
+          >
+            <i class="codicon codicon-close" aria-hidden="true"></i>
+          </button>
+        </div>
+      </div>
+
+      <button
+        id="closePopupButton"
+        class="close-dot"
+        type="button"
+        aria-label="Close Quick Notepad"
+      ></button>
+      <div id="resizeHandle" class="resize-handle" role="presentation" aria-hidden="true"></div>
+    </div>
+
+    <script type="module" src="popup.js"></script>
+  </body>
 </html>
