@@ -14,6 +14,12 @@ import {
   isConflictOverlayVisible as conflictOverlayVisible,
   updateConflictNavigationControls
 } from './modules/conflictOverlay.js';
+import {
+  RESIZE_MIN_WIDTH,
+  RESIZE_MIN_HEIGHT,
+  RESIZE_MAX_WIDTH,
+  RESIZE_MAX_HEIGHT
+} from './shared/constants.js';
 
 const elements = {
   app: document.getElementById('app'),
@@ -150,11 +156,6 @@ const emojiList = [
   '📍',
   '💬'
 ];
-
-const RESIZE_MIN_WIDTH = 320;
-const RESIZE_MIN_HEIGHT = 360;
-const RESIZE_MAX_WIDTH = 640;
-const RESIZE_MAX_HEIGHT = 599;
 
 let resizeSession = null;
 let stateManager;
@@ -654,7 +655,7 @@ function handleAddNoteTab() {
   announce('New note created');
 }
 
-async function handleCloseNoteTab(noteId) {
+function handleCloseNoteTab(noteId) {
   const state = stateManager.getState();
   const notes = state.notes || [];
   const note = notes.find(n => n.id === noteId);
@@ -669,15 +670,28 @@ async function handleCloseNoteTab(noteId) {
     return;
   }
 
-  const confirmed = await confirmationDialog.confirm(
-    `Close note "${note.title}"? This cannot be undone.`,
-    { showDontAsk: false }
-  );
-
-  if (!confirmed) {
+  // Check if user wants confirmation
+  if (!state.suppressTabCloseConfirm) {
+    confirmationDialog.show({
+      message: `Close note "${note.title}"? This action cannot be undone.`,
+      confirmLabel: 'Close Note',
+      onConfirm: context => {
+        if (context.suppressFutureConfirms) {
+          stateManager.save({ suppressTabCloseConfirm: true });
+        }
+        performCloseNoteTab(noteId);
+      },
+      includeDontAsk: true
+    });
     return;
   }
 
+  performCloseNoteTab(noteId);
+}
+
+function performCloseNoteTab(noteId) {
+  const state = stateManager.getState();
+  const notes = state.notes || [];
   const updatedNotes = notes.filter(n => n.id !== noteId);
   let newActiveId = state.activeNoteId;
 
@@ -691,6 +705,7 @@ async function handleCloseNoteTab(noteId) {
     updateWordCount(nextNote.content || '');
   }
 
+  const note = notes.find(n => n.id === noteId);
   stateManager.save({
     notes: updatedNotes,
     activeNoteId: newActiveId
@@ -1612,6 +1627,7 @@ function applyStateToUI(state) {
 function bindEvents() {
   elements.copyButton.addEventListener('click', copyAll);
   elements.clearNoteButton.addEventListener('click', clearNote);
+  elements.themeButton && elements.themeButton.addEventListener('click', () => panelManager.toggle('theme'));
   elements.fontButton.addEventListener('click', () => panelManager.toggle('font'));
   elements.emojiButton.addEventListener('click', () => panelManager.toggle('emoji'));
   elements.templateButton &&
@@ -1966,6 +1982,10 @@ function startResize(event) {
     startWidth,
     startHeight
   };
+
+  // Add resizing class to hide caret and prevent flickering
+  document.body.classList.add('is-resizing');
+
   elements.resizeHandle.setPointerCapture &&
     elements.resizeHandle.setPointerCapture(event.pointerId);
   document.addEventListener('pointermove', handleResizeMove);
@@ -2013,6 +2033,9 @@ function endResize(event) {
   document.removeEventListener('pointermove', handleResizeMove);
   document.removeEventListener('pointercancel', endResize);
   document.removeEventListener('pointerup', endResize);
+
+  // Remove resizing class to restore caret
+  document.body.classList.remove('is-resizing');
 
   // Save window size when resize ends
   const width = window.outerWidth || document.documentElement.clientWidth;

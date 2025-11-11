@@ -1,0 +1,20 @@
+# Editor directories
+.obsidian/
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
+*.swp
+*~
+
+# Build artifacts
+*.zip
+
+# Node modules (if added in future)
+node_modules/

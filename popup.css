@@ -8,20 +8,21 @@
   --font-family: 'Fira Code', 'Space Mono', monospace;
   --light-bg: #dbe4f2;
   --light-panel: #eef3fc;
-  --light-border: #8899b5;
+  --light-border: #4a90e2;
   --light-text: #09121d;
   --light-subtle: rgba(9, 18, 29, 0.65);
+  --light-accent: #4a90e2;
   --dark-bg: #041407;
   --dark-panel: rgba(6, 26, 12, 0.92);
   --dark-border: #33ff80;
   --dark-text: #33ff80;
   --dark-subtle: rgba(51, 255, 128, 0.6);
-  --accent-primary: #33ff80;
-  --accent-muted: rgba(51, 255, 128, 0.25);
-  --accent-muted-strong: rgba(51, 255, 128, 0.4);
-  --shadow-light: 0 0 0 1px rgba(9, 18, 29, 0.4);
+  --accent-primary: #4a90e2;
+  --accent-muted: rgba(74, 144, 226, 0.25);
+  --accent-muted-strong: rgba(74, 144, 226, 0.4);
+  --shadow-light: 0 0 0 1px rgba(74, 144, 226, 0.4);
   --shadow-dark: 0 0 0 1px rgba(51, 255, 128, 0.4);
-  --selection-light: rgba(12, 30, 54, 0.3);
+  --selection-light: rgba(74, 144, 226, 0.3);
   --selection-dark: rgba(51, 255, 128, 0.45);
   --tooltip-bg: rgba(6, 18, 10, 0.96);
   --tooltip-text: #33ff80;
@@ -143,6 +144,7 @@ body.theme-light {
   );
   --note-container-border: var(--light-border);
   --note-container-shadow: var(--shadow-light);
+  --accent-primary: var(--light-accent);
 }
 
 /* Monokai theme - WCAG AA compliant colors
@@ -791,14 +793,20 @@ body.theme-light {
   border: none;
   border-radius: 2px;
   cursor: pointer;
-  opacity: 0.6;
+  opacity: 0.7;
   transition: all 0.15s ease;
   flex-shrink: 0;
 }
 
+/* Better contrast for light themes */
+.theme-light .note-tab-close {
+  opacity: 0.85;
+  color: #ff3b30;
+}
+
 .note-tab-close:hover {
   opacity: 1;
-  background: var(--error-color);
+  background: var(--error-color, #ff3b30);
   color: white;
 }
 
@@ -855,6 +863,11 @@ body.theme-light {
   color: var(--note-text-color);
   caret-color: var(--note-text-color);
   outline: none;
+}
+
+/* Hide caret during resize to prevent flickering */
+body.is-resizing #noteArea {
+  caret-color: transparent;
 }
 
 #noteArea:focus-visible {
@@ -1785,8 +1798,7 @@ body.theme-light {
 .conflict-preview::-webkit-scrollbar-track,
 .conflict-panel::-webkit-scrollbar-track,
 .note-tab-list::-webkit-scrollbar-track {
-  background: var(--light-panel);
-  border-left: 1px solid var(--light-border);
+  background: transparent;
 }
 
 #noteArea::-webkit-scrollbar-thumb,
@@ -1817,8 +1829,7 @@ body.theme-light {
 .theme-dark .conflict-preview::-webkit-scrollbar-track,
 .theme-dark .conflict-panel::-webkit-scrollbar-track,
 .theme-dark .note-tab-list::-webkit-scrollbar-track {
-  background: var(--dark-panel);
-  border-left: 1px solid var(--dark-border);
+  background: transparent;
 }
 
 .theme-dark #noteArea::-webkit-scrollbar-thumb,
