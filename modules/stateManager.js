@@ -34,16 +34,16 @@ export default class StateManager {
       activeNoteId: null,
       theme: 'default_bright',
       font: {
-        size: 14,
-        family: 'default',
+        size: 16,
+        family: "'Fira Code', monospace",
         isBold: false,
         isItalic: false
       },
       windowSize: { width: 480, height: 600 },
       suppressClearConfirm: false,
       suppressTabCloseConfirm: false,
-      syncEnabled: false,
-      lastSyncTime: null
+      spellcheckEnabled: false,
+      spellcheckLang: 'en_US'
     };
   }
 

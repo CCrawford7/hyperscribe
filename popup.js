@@ -7,13 +7,8 @@ import ConfirmationDialog from './modules/confirmationDialog.js';
 import PanelManager from './modules/panelManager.js';
 import TemplateManager from './modules/templateManager.js';
 import NotesManager from './modules/notesManager.js';
-import SyncManager, { CONFLICT_RESOLUTION } from './modules/syncManager.js';
-import {
-  showConflictOverlay as renderConflictOverlay,
-  hideConflictOverlay as concealConflictOverlay,
-  isConflictOverlayVisible as conflictOverlayVisible,
-  updateConflictNavigationControls
-} from './modules/conflictOverlay.js';
+import SpellcheckManager from './modules/spellcheckManager.js';
+import SpellcheckRenderer from './modules/spellcheckRenderer.js';
 import {
   RESIZE_MIN_WIDTH,
   RESIZE_MIN_HEIGHT,
@@ -41,11 +36,18 @@ const elements = {
   fontFamilySelect: document.getElementById('fontFamilySelect'),
   boldToggle: document.getElementById('boldToggle'),
   italicToggle: document.getElementById('italicToggle'),
+  spellcheckToggle: document.getElementById('spellcheckToggle'),
+  spellcheckLangSelect: document.getElementById('spellcheckLangSelect'),
+  spellcheckHighlights: document.getElementById('spellcheckHighlights'),
+  spellcheckContextMenu: document.getElementById('spellcheckContextMenu'),
+  addToDictionaryBtn: document.getElementById('addToDictionaryBtn'),
+  spellcheckSuggestions: document.getElementById('spellcheckSuggestions'),
   emojiPanel: document.getElementById('emojiPanel'),
   emojiGrid: document.getElementById('emojiGrid'),
   noteArea: document.getElementById('noteArea'),
   storageUsage: document.getElementById('storageUsage'),
   clearStorageButton: document.getElementById('clearStorageButton'),
+  floatWindowButton: document.getElementById('floatWindowButton'),
   confirmOverlay: document.getElementById('confirmOverlay'),
   confirmMessage: document.getElementById('confirmMessage'),
   confirmAcceptButton: document.getElementById('confirmAcceptButton'),
@@ -58,46 +60,15 @@ const elements = {
   templateButton: document.getElementById('templateButton'),
   templatePanel: document.getElementById('templatePanel'),
   templateGrid: document.getElementById('templateGrid'),
+  exportTemplatesButton: document.getElementById('exportTemplatesButton'),
+  importTemplatesButton: document.getElementById('importTemplatesButton'),
+  importTemplatesInput: document.getElementById('importTemplatesInput'),
   wordCount: document.getElementById('wordCount'),
   saveIndicator: document.getElementById('saveIndicator'),
   saveIndicatorText: document.querySelector('#saveIndicator .save-indicator-text'),
-  syncButton: document.getElementById('syncButton'),
-  syncPanel: document.getElementById('syncPanel'),
-  syncToggle: document.getElementById('syncToggle'),
-  syncStatus: document.getElementById('syncStatus'),
-  syncLastSyncRow: document.getElementById('syncLastSyncRow'),
-  syncLastSync: document.getElementById('syncLastSync'),
-  syncUsageRow: document.getElementById('syncUsageRow'),
-  syncUsage: document.getElementById('syncUsage'),
-  syncNowButton: document.getElementById('syncNowButton'),
-  clearSyncButton: document.getElementById('clearSyncButton'),
-  syncIndicator: document.getElementById('syncIndicator'),
-  conflictOverlay: document.getElementById('conflictOverlay'),
-  conflictLocalPreview: document.getElementById('conflictLocalPreview'),
-  conflictCloudPreview: document.getElementById('conflictCloudPreview'),
-  conflictLocalTime: document.getElementById('conflictLocalTime'),
-  conflictCloudTime: document.getElementById('conflictCloudTime'),
-  conflictCounter: document.getElementById('conflictCounter'),
-  conflictPrev: document.getElementById('conflictPrev'),
-  conflictNext: document.getElementById('conflictNext'),
-  conflictKeepLocal: document.getElementById('conflictKeepLocal'),
-  conflictKeepCloud: document.getElementById('conflictKeepCloud'),
-  conflictKeepBoth: document.getElementById('conflictKeepBoth'),
   exportSettingsButton: document.getElementById('exportSettingsButton'),
   importSettingsButton: document.getElementById('importSettingsButton'),
   importSettingsInput: document.getElementById('importSettingsInput'),
-  browseSyncedNotesButton: document.getElementById('browseSyncedNotesButton'),
-  syncedNotesBrowser: document.getElementById('syncedNotesBrowser'),
-  closeSyncedNotesBrowser: document.getElementById('closeSyncedNotesBrowser'),
-  syncedNotePreview: document.getElementById('syncedNotePreview'),
-  syncedNoteDate: document.getElementById('syncedNoteDate'),
-  syncedNoteSize: document.getElementById('syncedNoteSize'),
-  loadSyncedNoteButton: document.getElementById('loadSyncedNoteButton'),
-  previewSyncedNoteButton: document.getElementById('previewSyncedNoteButton'),
-  syncedNotePreviewModal: document.getElementById('syncedNotePreviewModal'),
-  closeSyncedNotePreview: document.getElementById('closeSyncedNotePreview'),
-  syncedNotePreviewText: document.getElementById('syncedNotePreviewText'),
-  syncBrowserStatus: document.getElementById('syncBrowserStatus'),
   templateDialog: document.getElementById('templateDialog'),
   createTemplateButton: document.getElementById('createTemplateButton'),
   templateDialogClose: document.getElementById('templateDialogClose'),
@@ -166,13 +137,13 @@ let fontManager;
 // let _emojiNavigationIndex = -1;
 let templateManager;
 let exportFormatter;
+let spellcheckManager;
+let spellcheckRenderer;
+let currentSpellcheckWord = null; // Currently right-clicked misspelled word
 let isExportMenuOpen = false;
 let isMoreMenuOpen = false;
 const notesManager = new NotesManager();
 let saveIndicatorTimeout = null;
-let syncManager = null;
-let pendingSyncConflicts = [];
-let currentConflictIndex = 0;
 
 /**
  * Announce message to screen readers via ARIA live regions
@@ -226,10 +197,6 @@ async function init() {
     template: {
       panel: elements.templatePanel,
       button: elements.templateButton
-    },
-    sync: {
-      panel: elements.syncPanel,
-      button: elements.syncButton
     }
   });
 
@@ -248,6 +215,27 @@ async function init() {
   templateManager = new TemplateManager();
   exportFormatter = new ExportFormatter();
 
+  // Initialize spellcheck
+  spellcheckRenderer = new SpellcheckRenderer({
+    highlightsElement: elements.spellcheckHighlights,
+    textareaElement: elements.noteArea
+  });
+
+  spellcheckManager = new SpellcheckManager({
+    editorElement: elements.noteArea,
+    lang: 'en_US',
+    onMisspelledWords: (words) => {
+      spellcheckRenderer.updateHighlights(words);
+    }
+  });
+
+  // Initialize spellcheck manager
+  try {
+    await spellcheckManager.initialize();
+  } catch (error) {
+    console.error('Failed to initialize spellcheck:', error);
+  }
+
   renderEmojiButtons();
   await loadCustomTemplates();
   renderTemplates();
@@ -255,6 +243,26 @@ async function init() {
   await hydrateState();
   // Populate more menu for responsive layout
   populateMoreMenu();
+
+  // Listen for window resize in floating windows
+  window.addEventListener('resize', handleWindowResize);
+}
+
+let resizeDebounceTimer = null;
+function handleWindowResize() {
+  // Debounce resize events
+  if (resizeDebounceTimer) {
+    clearTimeout(resizeDebounceTimer);
+  }
+  resizeDebounceTimer = setTimeout(() => {
+    chrome.windows.getCurrent((win) => {
+      if (win && win.type === 'popup') {
+        // Re-apply viewport sizing for floating window
+        document.documentElement.style.setProperty('--popup-width', '100vw');
+        document.documentElement.style.setProperty('--popup-height', '100vh');
+      }
+    });
+  }, 100);
 }
 
 function populateMoreMenu() {
@@ -554,6 +562,96 @@ async function handleDeleteTemplate(templateId) {
   }
 }
 
+function handleExportTemplates() {
+  const customTemplates = templateManager.getCustomTemplates();
+
+  if (customTemplates.length === 0) {
+    announce('No custom templates to export', 'assertive');
+    return;
+  }
+
+  const exportData = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    templates: customTemplates.map(t => ({
+      name: t.name,
+      icon: t.icon,
+      description: t.description,
+      content: t.content
+    }))
+  };
+
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const date = new Date().toISOString().split('T')[0];
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `hyperscribe-templates-${date}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  announce(`Exported ${customTemplates.length} template${customTemplates.length === 1 ? '' : 's'}`);
+}
+
+async function handleImportTemplates(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+
+    // Validate structure
+    if (!data.templates || !Array.isArray(data.templates)) {
+      throw new Error('Invalid template file format');
+    }
+
+    // Validate each template
+    const validTemplates = data.templates.filter(t => {
+      return t.name && typeof t.name === 'string' &&
+             t.content && typeof t.content === 'string';
+    });
+
+    if (validTemplates.length === 0) {
+      throw new Error('No valid templates found in file');
+    }
+
+    // Import templates
+    let importedCount = 0;
+    for (const t of validTemplates) {
+      try {
+        templateManager.addTemplate({
+          name: t.name,
+          icon: t.icon || '📄',
+          description: t.description || '',
+          content: t.content
+        });
+        importedCount++;
+      } catch (err) {
+        // Template with same name may already exist, skip it
+        console.warn('Skipped template:', t.name, err.message);
+      }
+    }
+
+    if (importedCount > 0) {
+      await saveCustomTemplates();
+      renderTemplates();
+      announce(`Imported ${importedCount} template${importedCount === 1 ? '' : 's'}`);
+    } else {
+      announce('No new templates imported (may already exist)', 'assertive');
+    }
+  } catch (error) {
+    console.error('Failed to import templates:', error);
+    announce(error.message || 'Failed to import templates', 'assertive');
+  } finally {
+    // Reset file input so same file can be selected again
+    event.target.value = '';
+  }
+}
+
 function renderNoteTabs() {
   const state = stateManager.getState();
   const notes = state.notes || [];
@@ -633,6 +731,12 @@ function handleSwitchNoteTab(noteId) {
   elements.noteArea.value = note.content || '';
   updateWordCount(note.content || '');
   renderNoteTabs();
+  // Re-check spelling for the new tab content
+  if (spellcheckManager && spellcheckManager.isEnabled()) {
+    spellcheckManager.checkText(true);
+  } else if (spellcheckRenderer) {
+    spellcheckRenderer.clear();
+  }
   elements.noteArea.focus();
   announce(`Switched to ${note.title}`);
 }
@@ -650,6 +754,10 @@ function handleAddNoteTab() {
 
   elements.noteArea.value = '';
   updateWordCount('');
+  // Clear spellcheck highlights for new tab
+  if (spellcheckRenderer) {
+    spellcheckRenderer.clear();
+  }
   renderNoteTabs();
   elements.noteArea.focus();
   announce('New note created');
@@ -718,58 +826,6 @@ function performCloseNoteTab(noteId) {
 async function hydrateState() {
   const state = await stateManager.init();
   applyStateToUI(state);
-  initializeSync(state);
-}
-
-function canUseSync() {
-  return Boolean(chrome?.storage?.sync && typeof chrome.storage.sync.get === 'function');
-}
-
-function initializeSync(state) {
-  const toggle = elements.syncToggle;
-
-  if (!toggle) {
-    return;
-  }
-
-  if (!canUseSync()) {
-    toggle.checked = false;
-    toggle.disabled = true;
-    if (elements.syncStatus) {
-      elements.syncStatus.textContent = 'Unavailable';
-    }
-    if (elements.syncNowButton) {
-      elements.syncNowButton.disabled = true;
-    }
-    if (elements.clearSyncButton) {
-      elements.clearSyncButton.disabled = true;
-    }
-    hideSyncUsage();
-    setSyncIndicator(false);
-    return;
-  }
-
-  if (!syncManager) {
-    syncManager = new SyncManager({
-      stateManager,
-      onSyncStatusChange: handleSyncStatusChange,
-      onConflictDetected: handleSyncConflict,
-      showError: message => announce(message, 'assertive')
-    });
-  }
-
-  renderSyncStatus({
-    status: state.syncEnabled ? 'enabled' : 'disabled',
-    lastSync: state.lastSyncTime || null,
-    syncing: false,
-    error: null
-  });
-
-  if (state.syncEnabled) {
-    refreshSyncUsage();
-  } else {
-    hideSyncUsage();
-  }
 }
 
 function toggleExportMenu(event) {
@@ -1045,493 +1101,6 @@ function handleImportSettings(event) {
   reader.readAsText(file);
 }
 
-function renderSyncStatus(info = {}) {
-  const toggle = elements.syncToggle;
-  if (!toggle) {
-    return;
-  }
-
-  const state = stateManager.getState();
-  const enabled = Boolean(state.syncEnabled);
-  const status = info.status || (enabled ? 'enabled' : 'disabled');
-  const syncing = Boolean(info.syncing);
-  const lastSync = info.lastSync ?? state.lastSyncTime ?? null;
-  const error = info.error ?? null;
-
-  toggle.checked = enabled;
-  toggle.disabled = syncing;
-
-  if (elements.syncNowButton) {
-    elements.syncNowButton.disabled = !enabled || syncing;
-  }
-
-  if (elements.clearSyncButton) {
-    elements.clearSyncButton.disabled = syncing;
-  }
-
-  if (elements.syncStatus) {
-    elements.syncStatus.textContent = formatSyncStatusLabel(status, error, enabled);
-  }
-
-  if (elements.syncLastSyncRow && elements.syncLastSync) {
-    if (lastSync) {
-      elements.syncLastSyncRow.classList.remove('hidden');
-      elements.syncLastSync.textContent = new Date(lastSync).toLocaleString();
-    } else {
-      elements.syncLastSyncRow.classList.add('hidden');
-    }
-  }
-
-  setSyncIndicator(syncing, status);
-}
-
-function formatSyncStatusLabel(status, error, enabled) {
-  switch (status) {
-    case 'syncing':
-      return 'Syncing…';
-    case 'synced':
-      return 'Synced';
-    case 'enabled':
-      return 'Enabled';
-    case 'disabled':
-      return 'Disabled';
-    case 'conflict':
-      return 'Conflict detected';
-    case 'error':
-      return error ? `Error: ${error}` : 'Sync error';
-    default:
-      return enabled ? 'Enabled' : 'Disabled';
-  }
-}
-
-function handleSyncStatusChange(info) {
-  renderSyncStatus(info);
-
-  if (info.status === 'synced' || info.status === 'enabled') {
-    refreshSyncUsage();
-    hideConflictOverlay();
-    pendingSyncConflicts = [];
-  }
-
-  if (info.status === 'disabled') {
-    hideSyncUsage();
-    hideConflictOverlay();
-    pendingSyncConflicts = [];
-  }
-
-  if (info.status === 'error' && info.error) {
-    announce(`Sync error: ${info.error}`, 'assertive');
-  }
-
-  if (info.status === 'conflict' && pendingSyncConflicts.length > 0) {
-    showConflictOverlay(pendingSyncConflicts[0]);
-  }
-}
-
-function handleSyncConflict(conflicts = []) {
-  pendingSyncConflicts = Array.isArray(conflicts) ? conflicts : [];
-  currentConflictIndex = 0;
-  renderSyncStatus({ status: 'conflict', syncing: false, error: null });
-  if (pendingSyncConflicts.length > 0) {
-    showConflictOverlay(pendingSyncConflicts[0], currentConflictIndex);
-    announce('Sync conflict detected. Review differences below.', 'assertive');
-  } else {
-    hideConflictOverlay();
-  }
-}
-
-async function handleSyncToggleChange(event) {
-  if (!syncManager) {
-    if (event?.target) {
-      event.target.checked = false;
-    }
-    announce('Sync is not available in this environment.', 'assertive');
-    return;
-  }
-
-  const enable = Boolean(event?.target?.checked);
-
-  if (event?.target) {
-    event.target.disabled = true;
-  }
-
-  setSyncIndicator(true, 'syncing');
-
-  let result = { success: true };
-  try {
-    result = enable ? await syncManager.enable() : await syncManager.disable();
-  } catch (error) {
-    result = { success: false, error: error.message };
-  }
-
-  if (!result.success && event?.target) {
-    event.target.checked = !enable;
-  }
-
-  if (!result.success) {
-    announce(result.error || 'Unable to update sync settings', 'assertive');
-  }
-
-  if (result.success && enable) {
-    await refreshSyncUsage();
-  }
-
-  if (result.success && !enable) {
-    hideSyncUsage();
-    hideConflictOverlay();
-    pendingSyncConflicts = [];
-    currentConflictIndex = 0;
-  }
-
-  setSyncIndicator(false);
-
-  if (event?.target) {
-    event.target.disabled = false;
-  }
-
-  renderSyncStatus({
-    status: result.success ? (enable ? 'enabled' : 'disabled') : enable ? 'disabled' : 'enabled',
-    syncing: false,
-    error: result.success ? null : result.error
-  });
-}
-
-async function handleSyncNow(event) {
-  event?.preventDefault();
-
-  if (!syncManager) {
-    announce('Sync is not available in this environment.', 'assertive');
-    return;
-  }
-
-  if (elements.syncNowButton) {
-    elements.syncNowButton.disabled = true;
-  }
-
-  setSyncIndicator(true, 'syncing');
-
-  let result = { success: true };
-  try {
-    result = await syncManager.sync();
-  } catch (error) {
-    result = { success: false, error: error.message };
-  }
-
-  if (!result.success) {
-    announce(result.error || 'Sync failed', 'assertive');
-  } else {
-    await refreshSyncUsage();
-  }
-
-  setSyncIndicator(false);
-
-  if (elements.syncNowButton) {
-    const enabled = Boolean(stateManager.getState().syncEnabled);
-    elements.syncNowButton.disabled = !enabled;
-  }
-
-  renderSyncStatus({
-    status: result.success ? 'synced' : 'error',
-    syncing: false,
-    error: result.success ? null : result.error
-  });
-}
-
-async function handleClearSync(event) {
-  event?.preventDefault();
-
-  if (!syncManager) {
-    announce('Sync is not available in this environment.', 'assertive');
-    return;
-  }
-
-  if (elements.clearSyncButton) {
-    elements.clearSyncButton.disabled = true;
-  }
-
-  setSyncIndicator(true, 'syncing');
-
-  let success = true;
-  try {
-    await syncManager.clearSyncData();
-    announce('Sync data cleared', 'polite');
-  } catch (error) {
-    success = false;
-    announce('Unable to clear sync data', 'assertive');
-  }
-
-  setSyncIndicator(false);
-
-  if (elements.clearSyncButton) {
-    elements.clearSyncButton.disabled = false;
-  }
-
-  if (success) {
-    hideSyncUsage();
-    hideConflictOverlay();
-    pendingSyncConflicts = [];
-    currentConflictIndex = 0;
-  }
-
-  renderSyncStatus({
-    status: stateManager.getState().syncEnabled ? 'enabled' : 'disabled',
-    syncing: false,
-    error: success ? null : 'Failed to clear sync data'
-  });
-}
-
-async function refreshSyncUsage() {
-  if (!syncManager || !canUseSync() || !elements.syncUsage) {
-    hideSyncUsage();
-    return;
-  }
-
-  try {
-    const usage = await syncManager.calculateSyncUsage();
-    const percentage = `${usage.percentage}%`;
-    elements.syncUsage.textContent = `${usage.formatted} / ${usage.total} (${percentage})`;
-    if (elements.syncUsageRow) {
-      elements.syncUsageRow.classList.remove('hidden');
-    }
-  } catch (error) {
-    hideSyncUsage();
-  }
-}
-
-function hideSyncUsage() {
-  if (elements.syncUsageRow) {
-    elements.syncUsageRow.classList.add('hidden');
-  }
-  if (elements.syncUsage) {
-    elements.syncUsage.textContent = '0 B / 100 KB';
-  }
-}
-
-function setSyncIndicator(active, status = 'syncing') {
-  if (!elements.syncIndicator) {
-    return;
-  }
-
-  if (active) {
-    elements.syncIndicator.classList.remove('hidden');
-    elements.syncIndicator.setAttribute('data-status', status);
-    elements.syncIndicator.setAttribute('aria-hidden', 'false');
-  } else {
-    elements.syncIndicator.classList.add('hidden');
-    elements.syncIndicator.setAttribute('aria-hidden', 'true');
-  }
-}
-
-function focusConflictPrimaryControl() {
-  const target = elements.conflictKeepLocal || elements.conflictPrev || elements.conflictNext;
-  target?.focus?.();
-}
-
-function showConflictOverlay(conflict, index = currentConflictIndex) {
-  currentConflictIndex = index;
-  renderConflictOverlay(elements, conflict, currentConflictIndex, pendingSyncConflicts.length);
-  focusConflictPrimaryControl();
-}
-
-function hideConflictOverlay() {
-  concealConflictOverlay(elements);
-  currentConflictIndex = 0;
-  updateConflictNavigationControls(elements, 0, pendingSyncConflicts.length);
-}
-
-function isConflictOverlayVisible() {
-  return conflictOverlayVisible(elements);
-}
-
-function handleConflictNavigate(direction) {
-  if (pendingSyncConflicts.length === 0) {
-    return;
-  }
-
-  const nextIndex = currentConflictIndex + direction;
-  if (nextIndex < 0 || nextIndex >= pendingSyncConflicts.length) {
-    return;
-  }
-
-  showConflictOverlay(pendingSyncConflicts[nextIndex], nextIndex);
-}
-
-async function handleConflictResolution(strategy) {
-  if (!syncManager || pendingSyncConflicts.length === 0) {
-    hideConflictOverlay();
-    return;
-  }
-
-  const conflict = pendingSyncConflicts[currentConflictIndex];
-  setSyncIndicator(true, 'syncing');
-
-  let result = { success: true };
-  try {
-    result = await syncManager.resolveConflict(conflict.type, strategy);
-  } catch (error) {
-    result = { success: false, error: error.message };
-  }
-
-  setSyncIndicator(false);
-
-  if (!result.success) {
-    announce(result.error || 'Unable to resolve conflict', 'assertive');
-    return;
-  }
-
-  pendingSyncConflicts.splice(currentConflictIndex, 1);
-  if (currentConflictIndex >= pendingSyncConflicts.length) {
-    currentConflictIndex = Math.max(pendingSyncConflicts.length - 1, 0);
-  }
-
-  if (pendingSyncConflicts.length > 0) {
-    showConflictOverlay(pendingSyncConflicts[currentConflictIndex], currentConflictIndex);
-  } else {
-    hideConflictOverlay();
-  }
-}
-
-async function handleBrowseSyncedNotes(event) {
-  event?.preventDefault();
-
-  if (!syncManager || !canUseSync()) {
-    announce('Sync is not available in this environment.', 'assertive');
-    return;
-  }
-
-  try {
-    // Show browser
-    elements.syncedNotesBrowser.classList.remove('hidden');
-    if (elements.syncBrowserStatus) {
-      elements.syncBrowserStatus.textContent = 'Loading...';
-    }
-
-    // Fetch synced note metadata
-    const result = await syncManager.loadFromSync();
-
-    if (!result.success) {
-      // No synced note found
-      elements.syncedNotePreview.textContent = result.error || 'No synced note found';
-      elements.syncedNoteDate.textContent = '';
-      elements.syncedNoteSize.textContent = '';
-      elements.loadSyncedNoteButton.disabled = true;
-      elements.previewSyncedNoteButton.disabled = true;
-      if (elements.syncBrowserStatus) {
-        elements.syncBrowserStatus.textContent = '';
-      }
-      return;
-    }
-
-    // Display note preview
-    const notePreview =
-      result.note.substring(0, 100).trim() + (result.note.length > 100 ? '...' : '');
-    elements.syncedNotePreview.textContent = notePreview || 'Empty note';
-
-    // Display metadata
-    if (result.metadata.lastModified) {
-      const date = new Date(result.metadata.lastModified);
-      elements.syncedNoteDate.textContent = `Modified: ${date.toLocaleString()}`;
-    }
-
-    const noteSize = new Blob([result.note]).size;
-    elements.syncedNoteSize.textContent = syncManager.formatBytes(noteSize);
-
-    // Enable buttons
-    elements.loadSyncedNoteButton.disabled = false;
-    elements.previewSyncedNoteButton.disabled = false;
-
-    // Store full note for loading
-    elements.syncedNotesBrowser.dataset.fullNote = result.note;
-
-    // Check if cloud is newer
-    const newerCheck = await syncManager.hasNewerCloudData();
-    if (elements.syncBrowserStatus) {
-      if (newerCheck.hasNewer) {
-        elements.syncBrowserStatus.textContent = 'Cloud version is newer than local';
-      } else if (
-        newerCheck.cloudModified &&
-        newerCheck.localModified &&
-        newerCheck.cloudModified < newerCheck.localModified
-      ) {
-        elements.syncBrowserStatus.textContent = 'Local version is newer';
-      } else {
-        elements.syncBrowserStatus.textContent = '';
-      }
-    }
-
-    announce('Synced note loaded', 'polite');
-  } catch (error) {
-    console.error('Hyperscribe: Failed to browse synced notes', error);
-    announce('Failed to load synced notes', 'assertive');
-    elements.syncedNotePreview.textContent = 'Error loading synced note';
-    if (elements.syncBrowserStatus) {
-      elements.syncBrowserStatus.textContent = error.message || 'Unknown error';
-    }
-  }
-}
-
-function closeSyncedNotesBrowser() {
-  if (elements.syncedNotesBrowser) {
-    elements.syncedNotesBrowser.classList.add('hidden');
-    delete elements.syncedNotesBrowser.dataset.fullNote;
-  }
-  closeSyncedNotePreview();
-}
-
-async function handleLoadSyncedNote(event) {
-  event?.preventDefault();
-
-  const fullNote = elements.syncedNotesBrowser?.dataset.fullNote;
-  if (!fullNote) {
-    announce('No note to load', 'assertive');
-    return;
-  }
-
-  const currentNote = elements.noteArea.value;
-  const hasLocalContent = currentNote.trim().length > 0;
-
-  if (hasLocalContent && currentNote !== fullNote) {
-    // Show confirmation if local note will be overwritten
-    confirmationDialog.show({
-      message: 'Loading this note will replace your current note. Continue?',
-      confirmLabel: 'Load Note',
-      onConfirm: () => {
-        performLoadSyncedNote(fullNote);
-      }
-    });
-  } else {
-    performLoadSyncedNote(fullNote);
-  }
-}
-
-function performLoadSyncedNote(noteContent) {
-  elements.noteArea.value = noteContent;
-  updateActiveNoteContent(noteContent);
-  showSaveIndicator();
-  updateWordCount(noteContent);
-  closeSyncedNotesBrowser();
-  elements.noteArea.focus();
-  announce('Note loaded from cloud', 'polite');
-}
-
-function handlePreviewSyncedNote(event) {
-  event?.preventDefault();
-
-  const fullNote = elements.syncedNotesBrowser?.dataset.fullNote;
-  if (!fullNote) {
-    return;
-  }
-
-  elements.syncedNotePreviewText.textContent = fullNote;
-  elements.syncedNotePreviewModal.classList.remove('hidden');
-}
-
-function closeSyncedNotePreview() {
-  if (elements.syncedNotePreviewModal) {
-    elements.syncedNotePreviewModal.classList.add('hidden');
-  }
-}
-
 function deriveNoteTitle(content, state) {
   if (Array.isArray(state.notes) && state.activeNoteId) {
     const active = state.notes.find(note => note.id === state.activeNoteId);
@@ -1611,12 +1180,37 @@ function applyStateToUI(state) {
   themeManager.setTheme(themeId, { skipSave: true });
   fontManager.apply(state.font);
 
-  // Apply saved window dimensions
-  if (state.windowSize) {
-    document.documentElement.style.setProperty('--popup-width', state.windowSize.width + 'px');
-    document.documentElement.style.setProperty('--popup-height', state.windowSize.height + 'px');
-    document.body.style.width = '100%';
-    document.body.style.height = '100%';
+  // Check window type and apply appropriate sizing
+  chrome.windows.getCurrent((win) => {
+    const isFloatingWindow = win && win.type === 'popup';
+
+    if (isFloatingWindow) {
+      // In floating window, fill the entire window
+      document.documentElement.style.setProperty('--popup-width', '100vw');
+      document.documentElement.style.setProperty('--popup-height', '100vh');
+      document.body.style.width = '100vw';
+      document.body.style.height = '100vh';
+      // Hide the float button since we're already floating
+      if (elements.floatWindowButton) {
+        elements.floatWindowButton.style.display = 'none';
+      }
+    } else if (state.windowSize) {
+      // Extension popup - apply saved dimensions
+      document.documentElement.style.setProperty('--popup-width', state.windowSize.width + 'px');
+      document.documentElement.style.setProperty('--popup-height', state.windowSize.height + 'px');
+      document.body.style.width = '100%';
+      document.body.style.height = '100%';
+    }
+  });
+
+  // Apply spellcheck state
+  if (state.spellcheckLang) {
+    elements.spellcheckLangSelect.value = state.spellcheckLang;
+  }
+  if (state.spellcheckEnabled) {
+    elements.spellcheckToggle.checked = true;
+    spellcheckManager.enable();
+    spellcheckManager.checkText(true);
   }
 
   updateWordCount(elements.noteArea.value);
@@ -1632,11 +1226,15 @@ function bindEvents() {
   elements.emojiButton.addEventListener('click', () => panelManager.toggle('emoji'));
   elements.templateButton &&
     elements.templateButton.addEventListener('click', () => panelManager.toggle('template'));
-  elements.syncButton &&
-    elements.syncButton.addEventListener('click', () => panelManager.toggle('sync'));
   // Template dialog events
   elements.createTemplateButton &&
     elements.createTemplateButton.addEventListener('click', openTemplateDialog);
+  elements.exportTemplatesButton &&
+    elements.exportTemplatesButton.addEventListener('click', handleExportTemplates);
+  elements.importTemplatesButton &&
+    elements.importTemplatesButton.addEventListener('click', () => elements.importTemplatesInput?.click());
+  elements.importTemplatesInput &&
+    elements.importTemplatesInput.addEventListener('change', handleImportTemplates);
   elements.templateDialogClose &&
     elements.templateDialogClose.addEventListener('click', closeTemplateDialog);
   elements.templateDialogCancel &&
@@ -1648,10 +1246,17 @@ function bindEvents() {
   elements.downloadButton.addEventListener('click', toggleExportMenu);
   elements.exportMenu.addEventListener('click', handleExportMenuClick);
   elements.clearStorageButton.addEventListener('click', clearStoredData);
+  elements.floatWindowButton &&
+    elements.floatWindowButton.addEventListener('click', openFloatingWindow);
   elements.noteArea.addEventListener('input', handleNoteChange);
-  elements.syncToggle && elements.syncToggle.addEventListener('change', handleSyncToggleChange);
-  elements.syncNowButton && elements.syncNowButton.addEventListener('click', handleSyncNow);
-  elements.clearSyncButton && elements.clearSyncButton.addEventListener('click', handleClearSync);
+
+  // Spellcheck events
+  elements.spellcheckToggle && elements.spellcheckToggle.addEventListener('change', handleSpellcheckToggle);
+  elements.spellcheckLangSelect && elements.spellcheckLangSelect.addEventListener('change', handleSpellcheckLangChange);
+  elements.noteArea.addEventListener('contextmenu', handleSpellcheckContextMenu);
+  elements.addToDictionaryBtn && elements.addToDictionaryBtn.addEventListener('click', handleAddToDictionary);
+  document.addEventListener('click', hideSpellcheckContextMenu);
+
   // More menu toggle
   if (elements.moreButton) {
     elements.moreButton.addEventListener('click', e => {
@@ -1683,39 +1288,6 @@ function bindEvents() {
     );
   elements.importSettingsInput &&
     elements.importSettingsInput.addEventListener('change', handleImportSettings);
-  // Sync browser events
-  elements.browseSyncedNotesButton &&
-    elements.browseSyncedNotesButton.addEventListener('click', handleBrowseSyncedNotes);
-  elements.closeSyncedNotesBrowser &&
-    elements.closeSyncedNotesBrowser.addEventListener('click', closeSyncedNotesBrowser);
-  elements.loadSyncedNoteButton &&
-    elements.loadSyncedNoteButton.addEventListener('click', handleLoadSyncedNote);
-  elements.previewSyncedNoteButton &&
-    elements.previewSyncedNoteButton.addEventListener('click', handlePreviewSyncedNote);
-  elements.closeSyncedNotePreview &&
-    elements.closeSyncedNotePreview.addEventListener('click', closeSyncedNotePreview);
-  elements.conflictKeepLocal &&
-    elements.conflictKeepLocal.addEventListener('click', () =>
-      handleConflictResolution(CONFLICT_RESOLUTION.KEEP_LOCAL)
-    );
-  elements.conflictKeepCloud &&
-    elements.conflictKeepCloud.addEventListener('click', () =>
-      handleConflictResolution(CONFLICT_RESOLUTION.KEEP_CLOUD)
-    );
-  elements.conflictKeepBoth &&
-    elements.conflictKeepBoth.addEventListener('click', () =>
-      handleConflictResolution(CONFLICT_RESOLUTION.KEEP_BOTH)
-    );
-  elements.conflictPrev &&
-    elements.conflictPrev.addEventListener('click', () => handleConflictNavigate(-1));
-  elements.conflictNext &&
-    elements.conflictNext.addEventListener('click', () => handleConflictNavigate(1));
-  elements.conflictOverlay &&
-    elements.conflictOverlay.addEventListener('click', event => {
-      if (event.target === elements.conflictOverlay) {
-        hideConflictOverlay();
-      }
-    });
   document.addEventListener('keydown', handleGlobalKeyDown);
 
   // Listen for keyboard shortcut commands from background
@@ -1737,6 +1309,10 @@ function handleThemeChange(themeId) {
 
 function handleFontChange(fontState) {
   stateManager.save({ font: fontState });
+  // Sync spellcheck highlights to match new font properties
+  if (spellcheckRenderer) {
+    spellcheckRenderer.syncFontProperties();
+  }
   // Font changes are frequent, so we don't announce every keystroke
 }
 
@@ -1746,6 +1322,150 @@ function handleNoteChange(event) {
   updateWordCount(value);
   updateActiveNoteContent(value);
   renderNoteTabs();
+
+  // Trigger spellcheck if enabled
+  if (spellcheckManager && spellcheckManager.isEnabled()) {
+    spellcheckManager.checkText();
+  }
+}
+
+function handleSpellcheckToggle(event) {
+  const enabled = event.target.checked;
+
+  if (enabled) {
+    spellcheckManager.enable();
+    spellcheckManager.checkText(true); // Immediate check
+    announce('Spellcheck enabled');
+  } else {
+    spellcheckManager.disable();
+    spellcheckRenderer.clear();
+    announce('Spellcheck disabled');
+  }
+
+  // Save preference
+  stateManager.save({ spellcheckEnabled: enabled });
+}
+
+async function handleSpellcheckLangChange(event) {
+  const lang = event.target.value;
+  await spellcheckManager.setLanguage(lang);
+  stateManager.save({ spellcheckLang: lang });
+  announce(`Spellcheck language changed to ${lang === 'en_US' ? 'English US' : 'English GB'}`);
+}
+
+function handleSpellcheckContextMenu(event) {
+  // Only show context menu if spellcheck is enabled
+  if (!spellcheckManager || !spellcheckManager.isEnabled()) {
+    return; // Allow default context menu
+  }
+
+  // Get cursor position in textarea
+  const cursorPos = elements.noteArea.selectionStart;
+
+  // Check if cursor is on a misspelled word
+  const misspelledWord = spellcheckRenderer.getMisspelledWordAt(cursorPos);
+
+  if (!misspelledWord) {
+    return; // Allow default context menu
+  }
+
+  // Prevent default context menu
+  event.preventDefault();
+
+  // Store current word for later use
+  currentSpellcheckWord = misspelledWord;
+
+  // Position the context menu
+  const menu = elements.spellcheckContextMenu;
+  const appRect = document.getElementById('app').getBoundingClientRect();
+
+  // Calculate position relative to the app container
+  let x = event.clientX - appRect.left;
+  let y = event.clientY - appRect.top;
+
+  // Ensure menu doesn't go off-screen
+  menu.classList.remove('hidden');
+  const menuRect = menu.getBoundingClientRect();
+
+  if (x + menuRect.width > appRect.width) {
+    x = appRect.width - menuRect.width - 8;
+  }
+  if (y + menuRect.height > appRect.height) {
+    y = appRect.height - menuRect.height - 8;
+  }
+
+  menu.style.left = `${Math.max(8, x)}px`;
+  menu.style.top = `${Math.max(8, y)}px`;
+  menu.setAttribute('aria-hidden', 'false');
+
+  // Populate suggestions
+  populateSpellcheckSuggestions(misspelledWord);
+}
+
+function populateSpellcheckSuggestions(wordInfo) {
+  const container = elements.spellcheckSuggestions;
+  container.innerHTML = '';
+
+  if (!wordInfo.suggestions || wordInfo.suggestions.length === 0) {
+    const noSuggestions = document.createElement('div');
+    noSuggestions.className = 'context-menu-no-suggestions';
+    noSuggestions.textContent = 'No suggestions';
+    container.appendChild(noSuggestions);
+    return;
+  }
+
+  wordInfo.suggestions.forEach(suggestion => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'context-menu-suggestion';
+    btn.textContent = suggestion;
+    btn.addEventListener('click', () => {
+      replaceMisspelledWord(wordInfo, suggestion);
+      hideSpellcheckContextMenu();
+    });
+    container.appendChild(btn);
+  });
+}
+
+function replaceMisspelledWord(wordInfo, replacement) {
+  const text = elements.noteArea.value;
+  const newText = text.substring(0, wordInfo.start) + replacement + text.substring(wordInfo.end);
+  elements.noteArea.value = newText;
+
+  // Trigger input event to update state and re-check spelling
+  elements.noteArea.dispatchEvent(new Event('input', { bubbles: true }));
+
+  // Set cursor position after replacement
+  const newCursorPos = wordInfo.start + replacement.length;
+  elements.noteArea.setSelectionRange(newCursorPos, newCursorPos);
+  elements.noteArea.focus();
+
+  announce(`Replaced with ${replacement}`);
+}
+
+function handleAddToDictionary() {
+  if (!currentSpellcheckWord || !spellcheckManager) {
+    hideSpellcheckContextMenu();
+    return;
+  }
+
+  spellcheckManager.addToCustomDictionary(currentSpellcheckWord.word);
+  announce(`Added "${currentSpellcheckWord.word}" to dictionary`);
+  hideSpellcheckContextMenu();
+}
+
+function hideSpellcheckContextMenu(event) {
+  const menu = elements.spellcheckContextMenu;
+  if (!menu) return;
+
+  // If event is provided, check if click was inside the menu
+  if (event && menu.contains(event.target)) {
+    return;
+  }
+
+  menu.classList.add('hidden');
+  menu.setAttribute('aria-hidden', 'true');
+  currentSpellcheckWord = null;
 }
 
 function handleGlobalKeyDown(event) {
@@ -1753,21 +1473,11 @@ function handleGlobalKeyDown(event) {
     return;
   }
 
-  if (isConflictOverlayVisible()) {
-    if (event.key === 'Escape') {
-      hideConflictOverlay();
-      return;
-    }
-    if (event.key === 'ArrowLeft') {
-      handleConflictNavigate(-1);
-      event.preventDefault();
-      return;
-    }
-    if (event.key === 'ArrowRight') {
-      handleConflictNavigate(1);
-      event.preventDefault();
-      return;
-    }
+  // Close spellcheck context menu on Escape
+  if (event.key === 'Escape' && elements.spellcheckContextMenu && !elements.spellcheckContextMenu.classList.contains('hidden')) {
+    hideSpellcheckContextMenu();
+    event.preventDefault();
+    return;
   }
 
   // Close template dialog on Escape
@@ -1932,6 +1642,10 @@ function performClearNote() {
   updateActiveNoteContent('');
   showSaveIndicator();
   updateWordCount('');
+  // Clear spellcheck highlights
+  if (spellcheckRenderer) {
+    spellcheckRenderer.clear();
+  }
   elements.noteArea.focus();
   announce('Note cleared');
 }
@@ -1963,6 +1677,23 @@ function clearStoredData() {
       const state = stateManager.getState();
       applyStateToUI(state);
     }
+  });
+}
+
+function openFloatingWindow() {
+  const state = stateManager.getState();
+  const width = state.windowSize?.width || 480;
+  const height = state.windowSize?.height || 600;
+
+  chrome.windows.create({
+    url: chrome.runtime.getURL('popup.html'),
+    type: 'popup',
+    width: width + 16, // Account for window chrome
+    height: height + 39, // Account for title bar
+    focused: true
+  }, () => {
+    // Close the current popup after opening the floating window
+    window.close();
   });
 }
 

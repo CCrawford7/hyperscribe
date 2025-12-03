@@ -6,7 +6,14 @@ export default class ThemeManager {
     default_dark: { label: 'Default Dark', classes: ['theme-dark'] },
     monokai: { label: 'Monokai', classes: ['theme-dark', 'theme-monokai'] },
     nord: { label: 'Nord', classes: ['theme-dark', 'theme-nord'] },
-    dracula: { label: 'Dracula', classes: ['theme-dark', 'theme-dracula'] }
+    dracula: { label: 'Dracula', classes: ['theme-dark', 'theme-dracula'] },
+    'solarized-light': { label: 'Solarized Light', classes: ['theme-light', 'theme-solarized-light'] },
+    'solarized-dark': { label: 'Solarized Dark', classes: ['theme-dark', 'theme-solarized-dark'] },
+    'gruvbox-light': { label: 'Gruvbox Light', classes: ['theme-light', 'theme-gruvbox-light'] },
+    'gruvbox-dark': { label: 'Gruvbox Dark', classes: ['theme-dark', 'theme-gruvbox-dark'] },
+    'tomorrow-night': { label: 'Tomorrow Night', classes: ['theme-dark', 'theme-tomorrow-night'] },
+    'one-dark': { label: 'One Dark', classes: ['theme-dark', 'theme-one-dark'] },
+    zenburn: { label: 'Zenburn', classes: ['theme-dark', 'theme-zenburn'] }
   };
 
   #appElement = null;
@@ -48,7 +55,20 @@ export default class ThemeManager {
 
   #updateUI(themeId) {
     // Remove all theme classes first
-    const allThemeClasses = ['theme-light', 'theme-dark', 'theme-monokai', 'theme-nord', 'theme-dracula'];
+    const allThemeClasses = [
+      'theme-light',
+      'theme-dark',
+      'theme-monokai',
+      'theme-nord',
+      'theme-dracula',
+      'theme-solarized-light',
+      'theme-solarized-dark',
+      'theme-gruvbox-light',
+      'theme-gruvbox-dark',
+      'theme-tomorrow-night',
+      'theme-one-dark',
+      'theme-zenburn'
+    ];
     this.#appElement.classList.remove(...allThemeClasses);
 
     // Apply new theme classes

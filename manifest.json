@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Hyperscribe",
   "description": "A minimalist popup notepad with smart tools, terminal styling, and persistent settings.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "action": {
     "default_popup": "popup.html",
     "default_title": "Hyperscribe",
@@ -17,6 +17,12 @@
     "type": "module"
   },
   "permissions": ["storage", "downloads"],
+  "web_accessible_resources": [
+    {
+      "resources": ["dictionaries/*.dic", "dictionaries/*.aff", "lib/typo.js"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'; style-src 'self' https://fonts.googleapis.com https://microsoft.github.io; font-src 'self' https://fonts.gstatic.com https://microsoft.github.io data:;"
   },

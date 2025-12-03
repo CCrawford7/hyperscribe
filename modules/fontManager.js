@@ -1,6 +1,6 @@
 const defaultFontState = {
   size: 16,
-  family: 'Inter, sans-serif',
+  family: "'Fira Code', monospace",
   weight: 'normal',
   style: 'normal'
 };

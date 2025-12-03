@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://microsoft.github.io/vscode-codicons/dist/codicon.css" />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Roboto:wght@400;700&family=Merriweather:wght@400;700&family=Space+Mono:wght@400;700&family=Fira+Code:wght@400;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Roboto:wght@400;700&family=Merriweather:wght@400;700&family=Space+Mono:wght@400;700&family=Fira+Code:wght@400;600&family=JetBrains+Mono:wght@400;700&family=Source+Code+Pro:wght@400;700&family=IBM+Plex+Mono:wght@400;700&family=Inconsolata:wght@400;700&family=Ubuntu+Mono:wght@400;700&family=Roboto+Mono:wght@400;700&family=Anonymous+Pro:wght@400;700&family=Lato:wght@400;700&family=Open+Sans:wght@400;700&family=Nunito:wght@400;700&family=Poppins:wght@400;700&family=Playfair+Display:wght@400;700&family=Lora:wght@400;700&family=Source+Serif+4:wght@400;700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="popup.css" />
@@ -147,18 +147,6 @@
             <i class="codicon codicon-file-code" aria-hidden="true"></i>
             <span class="label">Templates</span>
           </button>
-          <button
-            id="syncButton"
-            class="toolbar-btn toolbar-btn-collapsible"
-            type="button"
-            data-short="SYNC"
-            data-tooltip="Sync settings"
-            aria-expanded="false"
-            aria-controls="syncPanel"
-          >
-            <i class="codicon codicon-sync" aria-hidden="true"></i>
-            <span class="label">Sync</span>
-          </button>
         </header>
       </main>
 
@@ -189,6 +177,34 @@
             <span class="theme-swatch theme-swatch-dracula" aria-hidden="true"></span>
             <span class="theme-name">Dracula</span>
           </button>
+          <button type="button" class="theme-chip" data-theme="solarized-light" aria-pressed="false">
+            <span class="theme-swatch theme-swatch-solarized-light" aria-hidden="true"></span>
+            <span class="theme-name">Solarized Light</span>
+          </button>
+          <button type="button" class="theme-chip" data-theme="solarized-dark" aria-pressed="false">
+            <span class="theme-swatch theme-swatch-solarized-dark" aria-hidden="true"></span>
+            <span class="theme-name">Solarized Dark</span>
+          </button>
+          <button type="button" class="theme-chip" data-theme="gruvbox-light" aria-pressed="false">
+            <span class="theme-swatch theme-swatch-gruvbox-light" aria-hidden="true"></span>
+            <span class="theme-name">Gruvbox Light</span>
+          </button>
+          <button type="button" class="theme-chip" data-theme="gruvbox-dark" aria-pressed="false">
+            <span class="theme-swatch theme-swatch-gruvbox-dark" aria-hidden="true"></span>
+            <span class="theme-name">Gruvbox Dark</span>
+          </button>
+          <button type="button" class="theme-chip" data-theme="tomorrow-night" aria-pressed="false">
+            <span class="theme-swatch theme-swatch-tomorrow-night" aria-hidden="true"></span>
+            <span class="theme-name">Tomorrow Night</span>
+          </button>
+          <button type="button" class="theme-chip" data-theme="one-dark" aria-pressed="false">
+            <span class="theme-swatch theme-swatch-one-dark" aria-hidden="true"></span>
+            <span class="theme-name">One Dark</span>
+          </button>
+          <button type="button" class="theme-chip" data-theme="zenburn" aria-pressed="false">
+            <span class="theme-swatch theme-swatch-zenburn" aria-hidden="true"></span>
+            <span class="theme-name">Zenburn</span>
+          </button>
         </div>
       </section>
 
@@ -209,12 +225,33 @@
         <div class="panel-row">
           <label for="fontFamilySelect">Font Family</label>
           <select id="fontFamilySelect" aria-label="Select font family">
-            <option value="Inter, sans-serif">Inter</option>
-            <option value="Roboto, sans-serif">Roboto</option>
-            <option value="Merriweather, serif">Merriweather</option>
-            <option value="Space Mono, monospace">Space Mono</option>
-            <option value="Fira Code, monospace">Fira Code</option>
-            <option value="Georgia, serif">Georgia</option>
+            <optgroup label="Monospace">
+              <option value="'Fira Code', monospace">Fira Code</option>
+              <option value="'JetBrains Mono', monospace">JetBrains Mono</option>
+              <option value="'Source Code Pro', monospace">Source Code Pro</option>
+              <option value="'IBM Plex Mono', monospace">IBM Plex Mono</option>
+              <option value="'Space Mono', monospace">Space Mono</option>
+              <option value="'Roboto Mono', monospace">Roboto Mono</option>
+              <option value="'Ubuntu Mono', monospace">Ubuntu Mono</option>
+              <option value="'Inconsolata', monospace">Inconsolata</option>
+              <option value="'Anonymous Pro', monospace">Anonymous Pro</option>
+            </optgroup>
+            <optgroup label="Sans-Serif">
+              <option value="'Inter', sans-serif">Inter</option>
+              <option value="'Roboto', sans-serif">Roboto</option>
+              <option value="'Lato', sans-serif">Lato</option>
+              <option value="'Open Sans', sans-serif">Open Sans</option>
+              <option value="'Nunito', sans-serif">Nunito</option>
+              <option value="'Poppins', sans-serif">Poppins</option>
+              <option value="system-ui, sans-serif">System UI</option>
+            </optgroup>
+            <optgroup label="Serif">
+              <option value="'Merriweather', serif">Merriweather</option>
+              <option value="'Playfair Display', serif">Playfair Display</option>
+              <option value="'Lora', serif">Lora</option>
+              <option value="'Source Serif 4', serif">Source Serif</option>
+              <option value="Georgia, serif">Georgia</option>
+            </optgroup>
           </select>
         </div>
         <div class="panel-row toggles">
@@ -224,6 +261,20 @@
           <button id="italicToggle" type="button" class="toggle-btn" aria-pressed="false">
             Italic
           </button>
+        </div>
+        <div class="panel-row">
+          <label for="spellcheckToggle" class="sync-toggle-label">Spellcheck</label>
+          <label class="toggle-switch">
+            <input id="spellcheckToggle" type="checkbox" />
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="panel-row">
+          <label for="spellcheckLangSelect">Language</label>
+          <select id="spellcheckLangSelect" aria-label="Select spellcheck language">
+            <option value="en_US">English (US)</option>
+            <option value="en_GB">English (GB)</option>
+          </select>
         </div>
       </section>
 
@@ -248,121 +299,37 @@
             <i class="codicon codicon-add" aria-hidden="true"></i>
             <span class="label">New Template</span>
           </button>
+          <div class="template-panel-actions">
+            <button
+              id="exportTemplatesButton"
+              type="button"
+              class="icon-btn"
+              data-tooltip="Export templates"
+              aria-label="Export custom templates"
+            >
+              <i class="codicon codicon-cloud-upload" aria-hidden="true"></i>
+            </button>
+            <button
+              id="importTemplatesButton"
+              type="button"
+              class="icon-btn"
+              data-tooltip="Import templates"
+              aria-label="Import custom templates"
+            >
+              <i class="codicon codicon-cloud-download" aria-hidden="true"></i>
+            </button>
+            <input
+              id="importTemplatesInput"
+              type="file"
+              accept="application/json"
+              class="sr-only"
+              hidden
+            />
+          </div>
         </div>
         <div id="templateGrid" class="template-grid"></div>
       </section>
 
-      <section
-        id="syncPanel"
-        class="panel hidden sync-panel"
-        aria-label="Sync settings"
-        aria-hidden="true"
-      >
-        <div class="panel-row">
-          <label for="syncToggle" class="sync-toggle-label">Enable Sync</label>
-          <label class="toggle-switch">
-            <input id="syncToggle" type="checkbox" />
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div class="sync-info">
-          <p class="sync-description">
-            Sync your notes across devices (Chrome account required). Maximum 100KB total storage.
-          </p>
-        </div>
-        <div class="panel-row">
-          <span class="sync-status-label">Status:</span>
-          <span id="syncStatus" class="sync-status">Disabled</span>
-        </div>
-        <div id="syncLastSyncRow" class="panel-row hidden">
-          <span class="sync-status-label">Last synced:</span>
-          <span id="syncLastSync" class="sync-last-sync">Never</span>
-        </div>
-        <div id="syncUsageRow" class="panel-row hidden">
-          <span class="sync-status-label">Storage used:</span>
-          <span id="syncUsage" class="sync-usage">0 B / 100 KB</span>
-        </div>
-        <div class="sync-actions">
-          <button id="syncNowButton" type="button" class="status-btn" disabled>
-            <i class="codicon codicon-sync" aria-hidden="true"></i>
-            <span class="label">Sync Now</span>
-          </button>
-          <button id="clearSyncButton" type="button" class="status-btn">
-            <i class="codicon codicon-trash" aria-hidden="true"></i>
-            <span class="label">Clear Sync Data</span>
-          </button>
-        </div>
-        <div class="sync-divider"></div>
-        <div class="sync-browse-section">
-          <button id="browseSyncedNotesButton" type="button" class="status-btn" disabled>
-            <i class="codicon codicon-cloud-download" aria-hidden="true"></i>
-            <span class="label">Browse Synced Notes</span>
-          </button>
-          <div id="syncedNotesBrowser" class="synced-notes-browser hidden">
-            <div class="synced-notes-header">
-              <span class="synced-notes-title">Cloud Storage</span>
-              <button
-                id="closeSyncedNotesBrowser"
-                type="button"
-                class="icon-btn"
-                aria-label="Close browser"
-              >
-                <i class="codicon codicon-close" aria-hidden="true"></i>
-              </button>
-            </div>
-            <div id="syncedNotesContent" class="synced-notes-content">
-              <div class="synced-note-item">
-                <div class="synced-note-info">
-                  <div class="synced-note-preview" id="syncedNotePreview">No synced note found</div>
-                  <div class="synced-note-meta">
-                    <span class="synced-note-date" id="syncedNoteDate"></span>
-                    <span class="synced-note-size" id="syncedNoteSize"></span>
-                  </div>
-                </div>
-                <div class="synced-note-actions">
-                  <button
-                    id="loadSyncedNoteButton"
-                    type="button"
-                    class="status-btn status-btn-primary"
-                    disabled
-                  >
-                    <i class="codicon codicon-arrow-down" aria-hidden="true"></i>
-                    <span class="label">Load Note</span>
-                  </button>
-                  <button
-                    id="previewSyncedNoteButton"
-                    type="button"
-                    class="icon-btn"
-                    disabled
-                    aria-label="Preview note"
-                  >
-                    <i class="codicon codicon-eye" aria-hidden="true"></i>
-                  </button>
-                </div>
-              </div>
-              <div id="syncedNotePreviewModal" class="synced-note-preview-modal hidden">
-                <div class="synced-note-preview-content">
-                  <div class="synced-note-preview-header">
-                    <span>Note Preview</span>
-                    <button
-                      id="closeSyncedNotePreview"
-                      type="button"
-                      class="icon-btn"
-                      aria-label="Close preview"
-                    >
-                      <i class="codicon codicon-close" aria-hidden="true"></i>
-                    </button>
-                  </div>
-                  <div id="syncedNotePreviewText" class="synced-note-preview-text"></div>
-                </div>
-              </div>
-            </div>
-            <div class="sync-browser-status">
-              <span id="syncBrowserStatus" class="sync-browser-status-text"></span>
-            </div>
-          </div>
-        </div>
-      </section>
 
       <nav id="noteTabs" class="note-tabs" role="tablist" aria-label="Note tabs">
         <div id="noteTabList" class="note-tab-list"></div>
@@ -372,6 +339,7 @@
       </nav>
 
       <article class="note-container">
+        <div id="spellcheckHighlights" class="spellcheck-highlights" aria-hidden="true"></div>
         <textarea
           id="noteArea"
           placeholder="Type your note..."
@@ -387,14 +355,6 @@
         <span id="saveIndicator" class="save-indicator hidden" aria-live="polite">
           <i class="codicon codicon-loading codicon-modifier-spin" aria-hidden="true"></i>
           <span class="save-indicator-text">Saving...</span>
-        </span>
-        <span
-          id="syncIndicator"
-          class="sync-indicator hidden"
-          aria-live="polite"
-          data-tooltip="Sync status"
-        >
-          <i class="codicon codicon-sync" aria-hidden="true"></i>
         </span>
         <button
           id="exportSettingsButton"
@@ -429,6 +389,15 @@
           aria-label="Clear saved data"
         >
           <i class="codicon codicon-database" aria-hidden="true"></i>
+        </button>
+        <button
+          id="floatWindowButton"
+          type="button"
+          class="status-btn icon-only"
+          data-tooltip="Open in floating window"
+          aria-label="Open in floating window"
+        >
+          <i class="codicon codicon-multiple-windows" aria-hidden="true"></i>
         </button>
       </footer>
 
@@ -469,56 +438,6 @@
         </div>
       </div>
 
-      <div
-        id="conflictOverlay"
-        class="conflict-overlay hidden"
-        role="dialog"
-        aria-modal="true"
-        aria-hidden="true"
-        aria-labelledby="conflictTitle"
-      >
-        <div class="conflict-panel">
-          <h3 id="conflictTitle" class="conflict-title">Sync Conflict Detected</h3>
-          <p class="conflict-message">
-            The note has been modified on multiple devices. Choose which version to keep:
-          </p>
-          <div class="conflict-navigation">
-            <button id="conflictPrev" type="button" class="icon-btn" aria-label="Previous conflict">
-              <i class="codicon codicon-chevron-left" aria-hidden="true"></i>
-            </button>
-            <span id="conflictCounter" class="conflict-counter">1 of 1</span>
-            <button id="conflictNext" type="button" class="icon-btn" aria-label="Next conflict">
-              <i class="codicon codicon-chevron-right" aria-hidden="true"></i>
-            </button>
-          </div>
-          <div class="conflict-versions">
-            <div class="conflict-version">
-              <h4 class="conflict-version-title">Local Version</h4>
-              <div id="conflictLocalPreview" class="conflict-preview"></div>
-              <span id="conflictLocalTime" class="conflict-timestamp"></span>
-            </div>
-            <div class="conflict-version">
-              <h4 class="conflict-version-title">Cloud Version</h4>
-              <div id="conflictCloudPreview" class="conflict-preview"></div>
-              <span id="conflictCloudTime" class="conflict-timestamp"></span>
-            </div>
-          </div>
-          <div class="conflict-actions">
-            <button id="conflictKeepLocal" type="button" class="status-btn">
-              <i class="codicon codicon-device-desktop" aria-hidden="true"></i>
-              <span class="label">Keep Local</span>
-            </button>
-            <button id="conflictKeepCloud" type="button" class="status-btn">
-              <i class="codicon codicon-cloud" aria-hidden="true"></i>
-              <span class="label">Keep Cloud</span>
-            </button>
-            <button id="conflictKeepBoth" type="button" class="status-btn">
-              <i class="codicon codicon-files" aria-hidden="true"></i>
-              <span class="label">Keep Both</span>
-            </button>
-          </div>
-        </div>
-      </div>
 
       <div
         id="templateDialog"
@@ -619,6 +538,20 @@
             <i class="codicon codicon-close" aria-hidden="true"></i>
           </button>
         </div>
+      </div>
+
+      <div
+        id="spellcheckContextMenu"
+        class="spellcheck-context-menu hidden"
+        role="menu"
+        aria-hidden="true"
+      >
+        <button type="button" class="context-menu-item" id="addToDictionaryBtn" role="menuitem">
+          <i class="codicon codicon-add" aria-hidden="true"></i>
+          <span>Add to dictionary</span>
+        </button>
+        <div class="context-menu-divider" role="separator"></div>
+        <div class="context-menu-suggestions" id="spellcheckSuggestions"></div>
       </div>
 
       <button
