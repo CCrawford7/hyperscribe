@@ -194,6 +194,10 @@ export default class SpellcheckManager {
     }
   }
 
+  getCustomDictionaryWords() {
+    return Array.from(this.#customDictionary);
+  }
+
   async loadCustomDictionary() {
     try {
       const result = await chrome.storage.local.get('customSpellcheckDictionary');

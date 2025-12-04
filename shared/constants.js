@@ -13,7 +13,7 @@ export const RESIZE_MIN_WIDTH = 320;
 /**
  * Minimum height for the popup window resizing.
  */
-export const RESIZE_MIN_HEIGHT = 360;
+export const RESIZE_MIN_HEIGHT = 480;
 
 /**
  * Maximum width for the popup window resizing.

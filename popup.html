@@ -113,6 +113,16 @@
                 <span>Download as HTML</span>
               </button>
               <div class="export-divider" role="separator"></div>
+              <div class="export-template-row">
+                <label for="exportTemplateSelect">
+                  <i class="codicon codicon-file-code" aria-hidden="true"></i>
+                  <span>Template:</span>
+                </label>
+                <select id="exportTemplateSelect" aria-label="Select export template">
+                  <option value="">None</option>
+                </select>
+              </div>
+              <div class="export-divider" role="separator"></div>
               <button type="button" class="export-option" id="copyFormattedButton" role="menuitem">
                 <i class="codicon codicon-clippy" aria-hidden="true"></i>
                 <span>Copy as Formatted</span>
@@ -147,6 +157,14 @@
             <i class="codicon codicon-file-code" aria-hidden="true"></i>
             <span class="label">Templates</span>
           </button>
+          <label
+            class="toolbar-checkbox"
+            data-tooltip="Toggle spellcheck"
+          >
+            <input id="spellcheckToggle" type="checkbox" />
+            <i class="codicon codicon-whole-word" aria-hidden="true"></i>
+            <span class="label">ABC</span>
+          </label>
         </header>
       </main>
 
@@ -263,18 +281,39 @@
           </button>
         </div>
         <div class="panel-row">
-          <label for="spellcheckToggle" class="sync-toggle-label">Spellcheck</label>
-          <label class="toggle-switch">
-            <input id="spellcheckToggle" type="checkbox" />
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-        <div class="panel-row">
-          <label for="spellcheckLangSelect">Language</label>
+          <label for="spellcheckLangSelect">Spellcheck</label>
           <select id="spellcheckLangSelect" aria-label="Select spellcheck language">
             <option value="en_US">English (US)</option>
             <option value="en_GB">English (GB)</option>
           </select>
+        </div>
+        <div class="panel-row">
+          <button
+            id="manageDictionaryBtn"
+            type="button"
+            class="status-btn"
+            data-tooltip="Manage custom dictionary"
+            aria-label="Manage custom dictionary words"
+          >
+            <i class="codicon codicon-book" aria-hidden="true"></i>
+            <span class="label">Dictionary</span>
+          </button>
+        </div>
+      </section>
+
+      <section
+        id="dictionaryPanel"
+        class="panel hidden dictionary-panel"
+        aria-label="Custom dictionary"
+        aria-hidden="true"
+      >
+        <div class="dictionary-header">
+          <span class="dictionary-title">Custom Dictionary</span>
+          <span id="dictionaryCount" class="dictionary-count">0 words</span>
+        </div>
+        <div id="dictionaryWordList" class="dictionary-word-list"></div>
+        <div class="dictionary-empty" id="dictionaryEmpty">
+          No custom words added yet. Right-click misspelled words to add them.
         </div>
       </section>
 
@@ -394,10 +433,19 @@
           id="floatWindowButton"
           type="button"
           class="status-btn icon-only"
-          data-tooltip="Open in floating window"
-          aria-label="Open in floating window"
+          data-tooltip="Open always-on-top window"
+          aria-label="Open always-on-top window"
         >
-          <i class="codicon codicon-multiple-windows" aria-hidden="true"></i>
+          <i class="codicon codicon-pinned" aria-hidden="true"></i>
+        </button>
+        <button
+          id="feedbackButton"
+          type="button"
+          class="status-btn icon-only"
+          data-tooltip="Send feedback or report a bug"
+          aria-label="Send feedback or report a bug"
+        >
+          <i class="codicon codicon-feedback" aria-hidden="true"></i>
         </button>
       </footer>
 
@@ -520,6 +568,47 @@
       </div>
 
       <div
+        id="exportTemplateDialog"
+        class="template-dialog-overlay hidden"
+        role="dialog"
+        aria-modal="true"
+        aria-hidden="true"
+        aria-labelledby="exportTemplateDialogTitle"
+      >
+        <div class="template-dialog-panel export-template-dialog-panel">
+          <div class="template-dialog-header">
+            <h3 id="exportTemplateDialogTitle" class="template-dialog-title">Export Templates</h3>
+            <button
+              id="exportTemplateDialogClose"
+              type="button"
+              class="icon-btn"
+              aria-label="Close export dialog"
+            >
+              <i class="codicon codicon-close" aria-hidden="true"></i>
+            </button>
+          </div>
+          <div class="template-dialog-content">
+            <p class="export-template-instructions">Select templates to export:</p>
+            <div id="exportTemplateList" class="export-template-list"></div>
+            <label class="export-template-select-all">
+              <input type="checkbox" id="exportTemplateSelectAll" />
+              <span>Select all</span>
+            </label>
+          </div>
+          <div class="template-dialog-actions">
+            <button id="exportTemplateDialogCancel" type="button" class="status-btn">
+              <i class="codicon codicon-discard" aria-hidden="true"></i>
+              <span class="label">Cancel</span>
+            </button>
+            <button id="exportTemplateDialogConfirm" type="button" class="status-btn confirm">
+              <i class="codicon codicon-cloud-upload" aria-hidden="true"></i>
+              <span class="label">Export</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div
         id="errorToast"
         class="error-toast hidden"
         role="alert"
@@ -554,12 +643,6 @@
         <div class="context-menu-suggestions" id="spellcheckSuggestions"></div>
       </div>
 
-      <button
-        id="closePopupButton"
-        class="close-dot"
-        type="button"
-        aria-label="Close Hyperscribe"
-      ></button>
       <div id="resizeHandle" class="resize-handle" role="presentation" aria-hidden="true"></div>
     </div>
 

@@ -18,10 +18,17 @@ export default class SpellcheckRenderer {
   }
 
   #bindScrollSync() {
-    // Sync scroll position from textarea to highlights div
+    // Sync scroll position from textarea to highlights div using RAF for smooth sync
+    let ticking = false;
     this.#textareaElement.addEventListener('scroll', () => {
-      this.#highlightsElement.scrollTop = this.#textareaElement.scrollTop;
-      this.#highlightsElement.scrollLeft = this.#textareaElement.scrollLeft;
+      if (!ticking) {
+        requestAnimationFrame(() => {
+          this.#highlightsElement.scrollTop = this.#textareaElement.scrollTop;
+          this.#highlightsElement.scrollLeft = this.#textareaElement.scrollLeft;
+          ticking = false;
+        });
+        ticking = true;
+      }
     });
   }
 
@@ -50,6 +57,13 @@ export default class SpellcheckRenderer {
     this.#misspelledWords = misspelledWords;
     this.syncFontProperties(); // Sync before rendering to ensure alignment
     this.#render();
+    // Sync scroll position after render to ensure alignment at any scroll position
+    this.#syncScrollPosition();
+  }
+
+  #syncScrollPosition() {
+    this.#highlightsElement.scrollTop = this.#textareaElement.scrollTop;
+    this.#highlightsElement.scrollLeft = this.#textareaElement.scrollLeft;
   }
 
   clear() {
@@ -61,7 +75,7 @@ export default class SpellcheckRenderer {
     const text = this.#textareaElement.value;
 
     // Clear existing content
-    this.#highlightsElement.textContent = '';
+    this.#highlightsElement.innerHTML = '';
 
     if (!text || this.#misspelledWords.length === 0) {
       // Still need to render the full text for proper sizing
@@ -84,8 +98,8 @@ export default class SpellcheckRenderer {
         );
       }
 
-      // Add misspelled word with mark element
-      const mark = document.createElement('mark');
+      // Add misspelled word with span element (using span instead of mark for better CSS control)
+      const mark = document.createElement('span');
       mark.className = 'spellcheck-error';
       mark.textContent = text.substring(start, end);
       fragment.appendChild(mark);

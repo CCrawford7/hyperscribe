@@ -27,6 +27,7 @@ const elements = {
   emojiButton: document.getElementById('emojiButton'),
   downloadButton: document.getElementById('downloadButton'),
   exportMenu: document.getElementById('exportMenu'),
+  exportTemplateSelect: document.getElementById('exportTemplateSelect'),
   moreButton: document.getElementById('moreButton'),
   moreMenu: document.getElementById('moreMenu'),
   copyFormattedButton: document.getElementById('copyFormattedButton'),
@@ -42,18 +43,23 @@ const elements = {
   spellcheckContextMenu: document.getElementById('spellcheckContextMenu'),
   addToDictionaryBtn: document.getElementById('addToDictionaryBtn'),
   spellcheckSuggestions: document.getElementById('spellcheckSuggestions'),
+  manageDictionaryBtn: document.getElementById('manageDictionaryBtn'),
+  dictionaryPanel: document.getElementById('dictionaryPanel'),
+  dictionaryWordList: document.getElementById('dictionaryWordList'),
+  dictionaryCount: document.getElementById('dictionaryCount'),
+  dictionaryEmpty: document.getElementById('dictionaryEmpty'),
   emojiPanel: document.getElementById('emojiPanel'),
   emojiGrid: document.getElementById('emojiGrid'),
   noteArea: document.getElementById('noteArea'),
   storageUsage: document.getElementById('storageUsage'),
   clearStorageButton: document.getElementById('clearStorageButton'),
   floatWindowButton: document.getElementById('floatWindowButton'),
+  feedbackButton: document.getElementById('feedbackButton'),
   confirmOverlay: document.getElementById('confirmOverlay'),
   confirmMessage: document.getElementById('confirmMessage'),
   confirmAcceptButton: document.getElementById('confirmAcceptButton'),
   confirmCancelButton: document.getElementById('confirmCancelButton'),
   confirmDontAskCheckbox: document.getElementById('confirmDontAskCheckbox'),
-  closePopupButton: document.getElementById('closePopupButton'),
   resizeHandle: document.getElementById('resizeHandle'),
   ariaLivePolite: document.getElementById('ariaLivePolite'),
   ariaLiveAssertive: document.getElementById('ariaLiveAssertive'),
@@ -80,7 +86,13 @@ const elements = {
   templateContentInput: document.getElementById('templateContentInput'),
   noteTabs: document.getElementById('noteTabs'),
   noteTabList: document.getElementById('noteTabList'),
-  addNoteTab: document.getElementById('addNoteTab')
+  addNoteTab: document.getElementById('addNoteTab'),
+  exportTemplateDialog: document.getElementById('exportTemplateDialog'),
+  exportTemplateDialogClose: document.getElementById('exportTemplateDialogClose'),
+  exportTemplateDialogCancel: document.getElementById('exportTemplateDialogCancel'),
+  exportTemplateDialogConfirm: document.getElementById('exportTemplateDialogConfirm'),
+  exportTemplateList: document.getElementById('exportTemplateList'),
+  exportTemplateSelectAll: document.getElementById('exportTemplateSelectAll')
 };
 
 const themeChipButtons = Array.from(document.querySelectorAll('.theme-chip'));
@@ -419,6 +431,28 @@ function renderTemplates() {
 
   elements.templateGrid.textContent = '';
   elements.templateGrid.appendChild(fragment);
+
+  // Also update the export template selector
+  populateExportTemplateSelector();
+}
+
+function populateExportTemplateSelector() {
+  if (!elements.exportTemplateSelect) return;
+
+  const templates = templateManager.getTemplates();
+
+  // Clear existing options except the first "None" option
+  while (elements.exportTemplateSelect.options.length > 1) {
+    elements.exportTemplateSelect.remove(1);
+  }
+
+  // Add each template as an option
+  templates.forEach(template => {
+    const option = document.createElement('option');
+    option.value = template.id;
+    option.textContent = `${template.icon} ${template.name}`;
+    elements.exportTemplateSelect.appendChild(option);
+  });
 }
 
 function handleTemplateSelect(templateId) {
@@ -563,17 +597,113 @@ async function handleDeleteTemplate(templateId) {
 }
 
 function handleExportTemplates() {
-  const customTemplates = templateManager.getCustomTemplates();
+  openExportTemplateDialog();
+}
 
-  if (customTemplates.length === 0) {
-    announce('No custom templates to export', 'assertive');
+function openExportTemplateDialog() {
+  const allTemplates = templateManager.getTemplates();
+
+  if (allTemplates.length === 0) {
+    announce('No templates to export', 'assertive');
+    return;
+  }
+
+  if (!elements.exportTemplateDialog) {
+    console.error('Export template dialog element not found');
+    return;
+  }
+
+  // Populate the template list with all templates
+  renderExportTemplateList(allTemplates);
+
+  // Reset select all checkbox
+  if (elements.exportTemplateSelectAll) {
+    elements.exportTemplateSelectAll.checked = false;
+  }
+
+  // Show dialog
+  elements.exportTemplateDialog.classList.remove('hidden');
+  elements.exportTemplateDialog.setAttribute('aria-hidden', 'false');
+}
+
+function closeExportTemplateDialog() {
+  if (!elements.exportTemplateDialog) return;
+
+  elements.exportTemplateDialog.classList.add('hidden');
+  elements.exportTemplateDialog.setAttribute('aria-hidden', 'true');
+}
+
+function renderExportTemplateList(templates) {
+  if (!elements.exportTemplateList) return;
+
+  elements.exportTemplateList.innerHTML = '';
+
+  if (templates.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'export-template-empty';
+    empty.textContent = 'No custom templates available';
+    elements.exportTemplateList.appendChild(empty);
+    return;
+  }
+
+  templates.forEach(template => {
+    const item = document.createElement('label');
+    item.className = 'export-template-item';
+
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = template.id;
+    checkbox.dataset.templateId = template.id;
+
+    const info = document.createElement('div');
+    info.className = 'export-template-item-info';
+
+    const name = document.createElement('span');
+    name.className = 'export-template-item-name';
+    name.innerHTML = `<span>${template.icon}</span> ${template.name}`;
+
+    const desc = document.createElement('span');
+    desc.className = 'export-template-item-desc';
+    desc.textContent = template.description || 'No description';
+
+    info.appendChild(name);
+    info.appendChild(desc);
+
+    item.appendChild(checkbox);
+    item.appendChild(info);
+
+    elements.exportTemplateList.appendChild(item);
+  });
+}
+
+function handleExportTemplateSelectAll(event) {
+  const checked = event.target.checked;
+  const checkboxes = elements.exportTemplateList?.querySelectorAll('input[type="checkbox"]');
+  checkboxes?.forEach(cb => {
+    cb.checked = checked;
+  });
+}
+
+function performExportSelectedTemplates() {
+  const checkboxes = elements.exportTemplateList?.querySelectorAll('input[type="checkbox"]:checked');
+  if (!checkboxes || checkboxes.length === 0) {
+    announce('Please select at least one template to export', 'assertive');
+    return;
+  }
+
+  const selectedIds = Array.from(checkboxes).map(cb => cb.dataset.templateId);
+  const allTemplates = templateManager.getTemplates();
+  const selectedTemplates = allTemplates.filter(t => selectedIds.includes(t.id));
+
+  if (selectedTemplates.length === 0) {
+    announce('No templates selected', 'assertive');
     return;
   }
 
   const exportData = {
     version: 1,
     exportedAt: new Date().toISOString(),
-    templates: customTemplates.map(t => ({
+    templates: selectedTemplates.map(t => ({
       name: t.name,
       icon: t.icon,
       description: t.description,
@@ -593,12 +723,15 @@ function handleExportTemplates() {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 
-  announce(`Exported ${customTemplates.length} template${customTemplates.length === 1 ? '' : 's'}`);
+  closeExportTemplateDialog();
+  announce(`Exported ${selectedTemplates.length} template${selectedTemplates.length === 1 ? '' : 's'}`);
 }
 
 async function handleImportTemplates(event) {
   const file = event.target.files?.[0];
   if (!file) return;
+
+  showSaveIndicator('Importing...');
 
   try {
     const text = await file.text();
@@ -621,9 +754,17 @@ async function handleImportTemplates(event) {
 
     // Import templates
     let importedCount = 0;
+    const skipped = [];
     for (const t of validTemplates) {
       try {
+        // Generate ID from name (same logic as handleSaveTemplate)
+        const id = t.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '');
+
         templateManager.addTemplate({
+          id,
           name: t.name,
           icon: t.icon || '📄',
           description: t.description || '',
@@ -632,19 +773,25 @@ async function handleImportTemplates(event) {
         importedCount++;
       } catch (err) {
         // Template with same name may already exist, skip it
-        console.warn('Skipped template:', t.name, err.message);
+        skipped.push(t.name);
       }
     }
 
     if (importedCount > 0) {
       await saveCustomTemplates();
       renderTemplates();
+      hideSaveIndicator({ delay: 800, message: 'Imported!' });
       announce(`Imported ${importedCount} template${importedCount === 1 ? '' : 's'}`);
+    } else if (skipped.length > 0) {
+      hideSaveIndicator({ delay: 800, message: 'Skipped' });
+      announce(`Templates already exist: ${skipped.join(', ')}`, 'assertive');
     } else {
-      announce('No new templates imported (may already exist)', 'assertive');
+      hideSaveIndicator({ delay: 500, message: '' });
+      announce('No new templates imported', 'assertive');
     }
   } catch (error) {
     console.error('Failed to import templates:', error);
+    hideSaveIndicator({ delay: 800, message: 'Failed' });
     announce(error.message || 'Failed to import templates', 'assertive');
   } finally {
     // Reset file input so same file can be selected again
@@ -887,7 +1034,14 @@ function handleDocumentClickForMenus(event) {
 }
 
 function exportNote(format, { silent = false } = {}) {
-  const content = elements.noteArea.value;
+  let content = elements.noteArea.value;
+
+  // Check if a template is selected for export
+  const selectedTemplateId = elements.exportTemplateSelect?.value;
+  if (selectedTemplateId) {
+    content = applyExportTemplate(content, selectedTemplateId);
+  }
+
   const metadata = collectExportMetadata(content);
   const filename = buildExportFilename(format, metadata.title);
 
@@ -917,6 +1071,30 @@ function exportNote(format, { silent = false } = {}) {
       announce('Failed to download note', 'assertive');
     }
   );
+}
+
+function applyExportTemplate(noteContent, templateId) {
+  try {
+    const template = templateManager.getTemplate(templateId);
+    if (!template) return noteContent;
+
+    // Get the template content with variables replaced
+    let templateContent = templateManager.applyTemplate(templateId);
+
+    // If template has a [CONTENT] or [NOTE] placeholder, insert the note there
+    // Otherwise, prepend the template to the note content
+    if (templateContent.includes('[CONTENT]')) {
+      return templateContent.replace('[CONTENT]', noteContent);
+    } else if (templateContent.includes('[NOTE]')) {
+      return templateContent.replace('[NOTE]', noteContent);
+    } else {
+      // Append note content after template
+      return templateContent + '\n\n' + noteContent;
+    }
+  } catch (error) {
+    console.warn('Hyperscribe: failed to apply export template', error);
+    return noteContent;
+  }
 }
 
 function copyFormattedContent() {
@@ -1180,28 +1358,30 @@ function applyStateToUI(state) {
   themeManager.setTheme(themeId, { skipSave: true });
   fontManager.apply(state.font);
 
-  // Check window type and apply appropriate sizing
-  chrome.windows.getCurrent((win) => {
-    const isFloatingWindow = win && win.type === 'popup';
+  // Check if this is a floating window (via URL param or window type)
+  const urlParams = new URLSearchParams(window.location.search);
+  const isFloatingWindow = urlParams.get('floating') === 'true';
 
-    if (isFloatingWindow) {
-      // In floating window, fill the entire window
-      document.documentElement.style.setProperty('--popup-width', '100vw');
-      document.documentElement.style.setProperty('--popup-height', '100vh');
-      document.body.style.width = '100vw';
-      document.body.style.height = '100vh';
-      // Hide the float button since we're already floating
-      if (elements.floatWindowButton) {
-        elements.floatWindowButton.style.display = 'none';
-      }
-    } else if (state.windowSize) {
-      // Extension popup - apply saved dimensions
-      document.documentElement.style.setProperty('--popup-width', state.windowSize.width + 'px');
-      document.documentElement.style.setProperty('--popup-height', state.windowSize.height + 'px');
-      document.body.style.width = '100%';
-      document.body.style.height = '100%';
+  if (isFloatingWindow) {
+    // In floating window, fill the entire window
+    document.documentElement.style.setProperty('--popup-width', '100vw');
+    document.documentElement.style.setProperty('--popup-height', '100vh');
+    document.body.style.width = '100vw';
+    document.body.style.height = '100vh';
+    // Hide the float button and resize handle since we're already floating
+    if (elements.floatWindowButton) {
+      elements.floatWindowButton.style.display = 'none';
     }
-  });
+    if (elements.resizeHandle) {
+      elements.resizeHandle.style.display = 'none';
+    }
+  } else if (state.windowSize) {
+    // Extension popup - apply saved dimensions
+    document.documentElement.style.setProperty('--popup-width', state.windowSize.width + 'px');
+    document.documentElement.style.setProperty('--popup-height', state.windowSize.height + 'px');
+    document.body.style.width = '100%';
+    document.body.style.height = '100%';
+  }
 
   // Apply spellcheck state
   if (state.spellcheckLang) {
@@ -1241,6 +1421,15 @@ function bindEvents() {
     elements.templateDialogCancel.addEventListener('click', closeTemplateDialog);
   elements.templateDialogSave &&
     elements.templateDialogSave.addEventListener('click', handleSaveTemplate);
+  // Export template dialog events
+  elements.exportTemplateDialogClose &&
+    elements.exportTemplateDialogClose.addEventListener('click', closeExportTemplateDialog);
+  elements.exportTemplateDialogCancel &&
+    elements.exportTemplateDialogCancel.addEventListener('click', closeExportTemplateDialog);
+  elements.exportTemplateDialogConfirm &&
+    elements.exportTemplateDialogConfirm.addEventListener('click', performExportSelectedTemplates);
+  elements.exportTemplateSelectAll &&
+    elements.exportTemplateSelectAll.addEventListener('change', handleExportTemplateSelectAll);
   // Note tab events
   elements.addNoteTab && elements.addNoteTab.addEventListener('click', handleAddNoteTab);
   elements.downloadButton.addEventListener('click', toggleExportMenu);
@@ -1248,13 +1437,17 @@ function bindEvents() {
   elements.clearStorageButton.addEventListener('click', clearStoredData);
   elements.floatWindowButton &&
     elements.floatWindowButton.addEventListener('click', openFloatingWindow);
+  elements.feedbackButton &&
+    elements.feedbackButton.addEventListener('click', openFeedbackEmail);
   elements.noteArea.addEventListener('input', handleNoteChange);
+  elements.noteArea.addEventListener('wheel', handleCtrlScroll, { passive: false });
 
   // Spellcheck events
   elements.spellcheckToggle && elements.spellcheckToggle.addEventListener('change', handleSpellcheckToggle);
   elements.spellcheckLangSelect && elements.spellcheckLangSelect.addEventListener('change', handleSpellcheckLangChange);
   elements.noteArea.addEventListener('contextmenu', handleSpellcheckContextMenu);
   elements.addToDictionaryBtn && elements.addToDictionaryBtn.addEventListener('click', handleAddToDictionary);
+  elements.manageDictionaryBtn && elements.manageDictionaryBtn.addEventListener('click', toggleDictionaryPanel);
   document.addEventListener('click', hideSpellcheckContextMenu);
 
   // More menu toggle
@@ -1276,8 +1469,6 @@ function bindEvents() {
     }
   });
   document.addEventListener('click', handleDocumentClickForMenus);
-  elements.closePopupButton &&
-    elements.closePopupButton.addEventListener('click', () => window.close());
   elements.resizeHandle && elements.resizeHandle.addEventListener('pointerdown', startResize);
   elements.resizeHandle && elements.resizeHandle.addEventListener('dblclick', resetWindowSize);
   elements.exportSettingsButton &&
@@ -1326,6 +1517,37 @@ function handleNoteChange(event) {
   // Trigger spellcheck if enabled
   if (spellcheckManager && spellcheckManager.isEnabled()) {
     spellcheckManager.checkText();
+  }
+}
+
+function handleCtrlScroll(event) {
+  // Check for Ctrl+scroll (or Cmd+scroll on Mac)
+  if (!event.ctrlKey && !event.metaKey) return;
+
+  event.preventDefault();
+
+  const state = stateManager.getState();
+  const currentSize = state.font?.size || 16;
+  const delta = event.deltaY > 0 ? -1 : 1; // Scroll down = decrease, scroll up = increase
+  const newSize = Math.min(32, Math.max(12, currentSize + delta));
+
+  if (newSize !== currentSize) {
+    const newFont = { ...state.font, size: newSize };
+    fontManager.apply(newFont);
+    stateManager.save({ font: newFont });
+
+    // Update the font size slider if visible
+    if (elements.fontSizeControl) {
+      elements.fontSizeControl.value = newSize;
+    }
+    if (elements.fontSizeValue) {
+      elements.fontSizeValue.textContent = `${newSize}px`;
+    }
+
+    // Sync spellcheck highlights
+    if (spellcheckRenderer) {
+      spellcheckRenderer.syncFontProperties();
+    }
   }
 }
 
@@ -1468,6 +1690,62 @@ function hideSpellcheckContextMenu(event) {
   currentSpellcheckWord = null;
 }
 
+function toggleDictionaryPanel() {
+  const panel = elements.dictionaryPanel;
+  if (!panel) return;
+
+  const isHidden = panel.classList.contains('hidden');
+  if (isHidden) {
+    panel.classList.remove('hidden');
+    panel.setAttribute('aria-hidden', 'false');
+    renderDictionaryWords();
+  } else {
+    panel.classList.add('hidden');
+    panel.setAttribute('aria-hidden', 'true');
+  }
+}
+
+function renderDictionaryWords() {
+  if (!spellcheckManager || !elements.dictionaryWordList) return;
+
+  const words = spellcheckManager.getCustomDictionaryWords();
+  const container = elements.dictionaryWordList;
+  container.innerHTML = '';
+
+  // Update count
+  if (elements.dictionaryCount) {
+    elements.dictionaryCount.textContent = `${words.length} word${words.length !== 1 ? 's' : ''}`;
+  }
+
+  // Show/hide empty state
+  if (elements.dictionaryEmpty) {
+    elements.dictionaryEmpty.classList.toggle('hidden', words.length > 0);
+  }
+
+  // Render words
+  words.sort().forEach(word => {
+    const wordEl = document.createElement('span');
+    wordEl.className = 'dictionary-word';
+    wordEl.innerHTML = `
+      ${word}
+      <button type="button" class="dictionary-word-remove" data-word="${word}" aria-label="Remove ${word}">
+        <i class="codicon codicon-close" aria-hidden="true"></i>
+      </button>
+    `;
+    container.appendChild(wordEl);
+  });
+
+  // Bind remove buttons
+  container.querySelectorAll('.dictionary-word-remove').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const word = e.currentTarget.dataset.word;
+      spellcheckManager.removeFromCustomDictionary(word);
+      renderDictionaryWords();
+      announce(`Removed "${word}" from dictionary`);
+    });
+  });
+}
+
 function handleGlobalKeyDown(event) {
   if (confirmationDialog.handleEscape(event)) {
     return;
@@ -1487,6 +1765,17 @@ function handleGlobalKeyDown(event) {
     !elements.templateDialog.classList.contains('hidden')
   ) {
     closeTemplateDialog();
+    event.preventDefault();
+    return;
+  }
+
+  // Close export template dialog on Escape
+  if (
+    event.key === 'Escape' &&
+    elements.exportTemplateDialog &&
+    !elements.exportTemplateDialog.classList.contains('hidden')
+  ) {
+    closeExportTemplateDialog();
     event.preventDefault();
     return;
   }
@@ -1680,21 +1969,174 @@ function clearStoredData() {
   });
 }
 
-function openFloatingWindow() {
+function openFeedbackEmail() {
+  const manifest = chrome.runtime.getManifest();
+  const version = manifest.version || 'unknown';
+  const userAgent = navigator.userAgent;
+
+  const subject = encodeURIComponent(`Hyperscribe Feedback (v${version})`);
+  const body = encodeURIComponent(
+`--- Please describe your feedback, suggestion, or bug report below ---
+
+
+--- System Information (auto-filled) ---
+Version: ${version}
+Browser: ${userAgent}
+`
+  );
+
+  const email = 'xtfr.dev@outlook.com';
+  const mailtoUrl = `mailto:${email}?subject=${subject}&body=${body}`;
+
+  window.open(mailtoUrl, '_blank');
+}
+
+async function openFloatingWindow() {
+  // Try Document Picture-in-Picture first (always-on-top)
+  if ('documentPictureInPicture' in window) {
+    try {
+      await openPictureInPicture();
+      return;
+    } catch (error) {
+      console.warn('Document PiP failed, falling back to popup window:', error);
+    }
+  }
+
+  // Fallback to regular popup window using window.open
   const state = stateManager.getState();
   const width = state.windowSize?.width || 480;
   const height = state.windowSize?.height || 600;
 
-  chrome.windows.create({
-    url: chrome.runtime.getURL('popup.html'),
-    type: 'popup',
-    width: width + 16, // Account for window chrome
-    height: height + 39, // Account for title bar
-    focused: true
-  }, () => {
-    // Close the current popup after opening the floating window
-    window.close();
+  const popupUrl = chrome.runtime.getURL('popup.html') + '?floating=true';
+  const features = `width=${width},height=${height},resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no`;
+
+  window.open(popupUrl, 'hyperscribe-floating', features);
+}
+
+async function openPictureInPicture() {
+  const state = stateManager.getState();
+  const width = state.windowSize?.width || 400;
+  const height = state.windowSize?.height || 500;
+
+  // Request PiP window
+  const pipWindow = await documentPictureInPicture.requestWindow({
+    width: Math.min(width, 800),
+    height: Math.min(height, 600),
+    disallowReturnToOpener: false
   });
+
+  // Copy all stylesheets to PiP window
+  const styleSheets = [...document.styleSheets];
+  for (const sheet of styleSheets) {
+    try {
+      if (sheet.href) {
+        // External stylesheet - create link element
+        const link = pipWindow.document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = sheet.href;
+        pipWindow.document.head.appendChild(link);
+      } else if (sheet.cssRules) {
+        // Inline stylesheet - copy rules
+        const style = pipWindow.document.createElement('style');
+        const cssText = [...sheet.cssRules].map(rule => rule.cssText).join('\n');
+        style.textContent = cssText;
+        pipWindow.document.head.appendChild(style);
+      }
+    } catch (e) {
+      // CORS may block access to some stylesheets
+      console.warn('Could not copy stylesheet:', e);
+    }
+  }
+
+  // Add base styles for PiP window
+  const pipStyles = pipWindow.document.createElement('style');
+  pipStyles.textContent = `
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+    #pip-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+    #pip-container .note-container {
+      flex: 1;
+      min-height: 0;
+    }
+    #pip-container #noteArea {
+      height: 100%;
+    }
+    /* Hide elements not needed in PiP */
+    #pip-container #floatWindowButton,
+    #pip-container .resize-handle {
+      display: none !important;
+    }
+    /* Add PiP indicator */
+    #pip-container::before {
+      content: 'PINNED';
+      position: absolute;
+      top: 4px;
+      right: 8px;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      opacity: 0.5;
+      pointer-events: none;
+      z-index: 1000;
+    }
+  `;
+  pipWindow.document.head.appendChild(pipStyles);
+
+  // Create container in PiP window
+  const container = pipWindow.document.createElement('div');
+  container.id = 'pip-container';
+
+  // Clone the app content
+  const appClone = elements.app.cloneNode(true);
+
+  // Apply current theme classes to body
+  const themeClasses = [...document.body.classList].filter(c => c.startsWith('theme-'));
+  pipWindow.document.body.classList.add(...themeClasses);
+
+  container.appendChild(appClone);
+  pipWindow.document.body.appendChild(container);
+
+  // Get references to cloned elements
+  const pipNoteArea = pipWindow.document.getElementById('noteArea');
+  const pipSpellcheckHighlights = pipWindow.document.getElementById('spellcheckHighlights');
+
+  // Sync note content bidirectionally
+  pipNoteArea.value = elements.noteArea.value;
+
+  // Listen for changes in PiP window
+  pipNoteArea.addEventListener('input', (e) => {
+    elements.noteArea.value = e.target.value;
+    elements.noteArea.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+
+  // Listen for changes in main window and sync to PiP
+  const syncToPip = () => {
+    if (pipNoteArea && pipWindow.document.body.contains(pipNoteArea)) {
+      pipNoteArea.value = elements.noteArea.value;
+    }
+  };
+  elements.noteArea.addEventListener('input', syncToPip);
+
+  // Handle PiP window close
+  pipWindow.addEventListener('pagehide', () => {
+    elements.noteArea.removeEventListener('input', syncToPip);
+    announce('Picture-in-Picture closed');
+  });
+
+  // Focus the textarea in PiP
+  pipNoteArea.focus();
+
+  announce('Opened in always-on-top window');
 }
 
 function startResize(event) {
