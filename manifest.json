@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Hyperscribe",
   "description": "A minimalist popup notepad with smart tools, terminal styling, and persistent settings.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "action": {
     "default_popup": "popup.html",
     "default_title": "Hyperscribe",
