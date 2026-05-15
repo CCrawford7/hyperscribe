@@ -1,3 +1,5 @@
+import FontLoader from './fontLoader.js';
+
 const defaultFontState = {
   size: 16,
   family: "'Fira Code', monospace",
@@ -17,9 +19,14 @@ export default class FontManager {
     this.handleBoldToggle = this.handleBoldToggle.bind(this);
     this.handleItalicToggle = this.handleItalicToggle.bind(this);
 
+    // Debounced emit for font size slider changes
+    this.#sizeDebounceTimer = null;
+
     this.bindEvents();
     this.applyStyles();
   }
+
+  #sizeDebounceTimer = null;
 
   bindEvents() {
     this.controls.size.addEventListener('input', this.handleSizeInput);
@@ -28,7 +35,7 @@ export default class FontManager {
     this.controls.italic.addEventListener('click', this.handleItalicToggle);
   }
 
-  apply(fontState = {}) {
+  async apply(fontState = {}) {
     this.state = {
       ...this.state,
       ...fontState,
@@ -50,6 +57,11 @@ export default class FontManager {
     const isItalic = this.state.style === 'italic';
     this.controls.italic.setAttribute('aria-pressed', String(isItalic));
 
+    // Lazy load the font if not already loaded
+    if (!FontLoader.isLoaded(this.state.family)) {
+      await FontLoader.loadFont(this.state.family);
+    }
+
     this.applyStyles();
   }
 
@@ -57,11 +69,27 @@ export default class FontManager {
     this.state.size = Number(event.target.value);
     this.controls.sizeIndicator.textContent = `${this.state.size}px`;
     this.applyStyles();
-    this.emit();
+    // Debounce saves during slider drag
+    if (this.#sizeDebounceTimer) {
+      clearTimeout(this.#sizeDebounceTimer);
+    }
+    this.#sizeDebounceTimer = setTimeout(() => {
+      this.#sizeDebounceTimer = null;
+      this.emit();
+    }, 200);
   }
 
-  handleFamilyChange(event) {
-    this.state.family = event.target.value;
+  async handleFamilyChange(event) {
+    const newFamily = event.target.value;
+
+    // Show loading indicator while font loads
+    this.noteArea.style.opacity = '0.7';
+
+    // Lazy load the font
+    await FontLoader.loadFont(newFamily);
+
+    this.state.family = newFamily;
+    this.noteArea.style.opacity = '1';
     this.applyStyles();
     this.emit();
   }

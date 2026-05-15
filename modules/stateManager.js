@@ -1,6 +1,6 @@
 // /modules/stateManager.js
 
-import { STORAGE_KEY } from '../shared/constants.js';
+import StorageRepository from './storageRepository.js';
 
 const DEBOUNCE_SAVE_DELAY = 500;
 
@@ -17,8 +17,8 @@ export default class StateManager {
 
   async init() {
     try {
-      const result = await chrome.storage.local.get(STORAGE_KEY);
-      this.#state = result[STORAGE_KEY] || this.#getDefaultState();
+      const storedState = await StorageRepository.getState();
+      this.#state = storedState || this.#getDefaultState();
     } catch (error) {
       console.error('Hyperscribe: Failed to initialize state from storage.', error);
       this.#state = this.#getDefaultState();
@@ -29,6 +29,7 @@ export default class StateManager {
 
   #getDefaultState() {
     return {
+      version: 1,
       note: '',
       notes: [],
       activeNoteId: null,
@@ -43,7 +44,9 @@ export default class StateManager {
       suppressClearConfirm: false,
       suppressTabCloseConfirm: false,
       spellcheckEnabled: false,
-      spellcheckLang: 'en_US'
+      spellcheckLang: 'en_US',
+      customThemeCss: '',
+      customThemeColors: null
     };
   }
 
@@ -58,26 +61,60 @@ export default class StateManager {
       clearTimeout(this.#saveTimeout);
     }
 
-    this.#saveTimeout = setTimeout(() => {
-      chrome.storage.local.set({ [STORAGE_KEY]: this.#state }, () => {
-        if (chrome.runtime.lastError) {
-          console.error('Hyperscribe: Error saving state:', chrome.runtime.lastError);
-        } else {
-          this.updateStorageUsage();
-          if (typeof this.#onStateChange === 'function') {
-            this.#onStateChange(this.#state);
-          }
+    this.#saveTimeout = setTimeout(async () => {
+      const success = await StorageRepository.saveState(this.#state);
+      if (success) {
+        this.updateStorageUsage();
+        if (typeof this.#onStateChange === 'function') {
+          this.#onStateChange(this.#state);
         }
-      });
+      } else {
+        console.error('Hyperscribe: Error saving state');
+      }
     }, DEBOUNCE_SAVE_DELAY);
+  }
+
+  /**
+   * Save state immediately without debouncing.
+   * Used for beforeunload to prevent data loss when popup closes.
+   */
+  async saveImmediate() {
+    // Cancel any pending debounced save
+    if (this.#saveTimeout) {
+      clearTimeout(this.#saveTimeout);
+      this.#saveTimeout = null;
+    }
+
+    // Save immediately and wait for completion
+    try {
+      await StorageRepository.saveState(this.#state);
+    } catch (error) {
+      console.error('Hyperscribe: Immediate save failed', error);
+    }
   }
 
   async updateStorageUsage() {
     if (!this.#storageUsageElement) return;
     try {
-      const bytes = await chrome.storage.local.getBytesInUse(STORAGE_KEY);
-      const usage = bytes ? (bytes / 1024).toFixed(2) + ' KB' : '0 KB';
+      const { bytes, percentage, status } = await StorageRepository.getStorageUsage();
+      const usage = bytes ? StorageRepository.formatBytes(bytes) : '0 B';
+
+      // Update display text
       this.#storageUsageElement.textContent = `Storage: ${usage}`;
+
+      // Remove previous warning classes
+      this.#storageUsageElement.classList.remove('storage-warning', 'storage-critical');
+
+      // Add warning/critical classes based on thresholds
+      if (status === 'critical') {
+        this.#storageUsageElement.classList.add('storage-critical');
+        this.#storageUsageElement.title = 'Storage nearly full! Consider exporting notes.';
+      } else if (status === 'warning') {
+        this.#storageUsageElement.classList.add('storage-warning');
+        this.#storageUsageElement.title = 'Storage usage is high. Consider exporting old notes.';
+      } else {
+        this.#storageUsageElement.title = '';
+      }
     } catch (error) {
       this.#storageUsageElement.textContent = 'Storage: N/A';
     }
@@ -100,7 +137,7 @@ export default class StateManager {
 
   async clear() {
     this.#state = this.#getDefaultState();
-    await chrome.storage.local.remove(STORAGE_KEY);
+    await StorageRepository.clearState();
     this.updateStorageUsage();
   }
 }

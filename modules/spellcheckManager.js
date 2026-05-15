@@ -1,6 +1,8 @@
 // modules/spellcheckManager.js
 // Manages spell checking with custom dictionary support
 
+import StorageRepository from './storageRepository.js';
+
 export default class SpellcheckManager {
   #spellChecker = null;
   #enabled = false;
@@ -200,9 +202,9 @@ export default class SpellcheckManager {
 
   async loadCustomDictionary() {
     try {
-      const result = await chrome.storage.local.get('customSpellcheckDictionary');
-      if (result.customSpellcheckDictionary) {
-        this.#customDictionary = new Set(result.customSpellcheckDictionary);
+      const words = await StorageRepository.getCustomDictionary();
+      if (words && words.length > 0) {
+        this.#customDictionary = new Set(words);
       }
     } catch (error) {
       console.error('Failed to load custom dictionary:', error);
@@ -211,9 +213,7 @@ export default class SpellcheckManager {
 
   async #saveCustomDictionary() {
     try {
-      await chrome.storage.local.set({
-        customSpellcheckDictionary: Array.from(this.#customDictionary)
-      });
+      await StorageRepository.saveCustomDictionary(Array.from(this.#customDictionary));
     } catch (error) {
       console.error('Failed to save custom dictionary:', error);
     }

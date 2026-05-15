@@ -9,12 +9,20 @@ import TemplateManager from './modules/templateManager.js';
 import NotesManager from './modules/notesManager.js';
 import SpellcheckManager from './modules/spellcheckManager.js';
 import SpellcheckRenderer from './modules/spellcheckRenderer.js';
+import ImageManager from './modules/imageManager.js';
+import NoteTabManager from './modules/noteTabManager.js';
+import StorageRepository from './modules/storageRepository.js';
+import ImageStorage from './modules/imageStorage.js';
+import DictationManager from './modules/dictationManager.js';
 import {
   RESIZE_MIN_WIDTH,
   RESIZE_MIN_HEIGHT,
   RESIZE_MAX_WIDTH,
   RESIZE_MAX_HEIGHT
 } from './shared/constants.js';
+
+// Detect if running in side panel context
+const isSidePanel = document.body.dataset.context === 'sidepanel';
 
 const elements = {
   app: document.getElementById('app'),
@@ -54,6 +62,8 @@ const elements = {
   storageUsage: document.getElementById('storageUsage'),
   clearStorageButton: document.getElementById('clearStorageButton'),
   floatWindowButton: document.getElementById('floatWindowButton'),
+  openSidePanelButton: document.getElementById('openSidePanelButton'),
+  dictateButton: document.getElementById('dictateButton'),
   feedbackButton: document.getElementById('feedbackButton'),
   confirmOverlay: document.getElementById('confirmOverlay'),
   confirmMessage: document.getElementById('confirmMessage'),
@@ -92,7 +102,45 @@ const elements = {
   exportTemplateDialogCancel: document.getElementById('exportTemplateDialogCancel'),
   exportTemplateDialogConfirm: document.getElementById('exportTemplateDialogConfirm'),
   exportTemplateList: document.getElementById('exportTemplateList'),
-  exportTemplateSelectAll: document.getElementById('exportTemplateSelectAll')
+  exportTemplateSelectAll: document.getElementById('exportTemplateSelectAll'),
+  // Image gallery elements
+  imageGallery: document.getElementById('imageGallery'),
+  imageGalleryGrid: document.getElementById('imageGalleryGrid'),
+  addImageButton: document.getElementById('addImageButton'),
+  // Error toast elements
+  errorToast: document.getElementById('errorToast'),
+  errorToastMessage: document.getElementById('errorToastMessage'),
+  errorToastClose: document.getElementById('errorToastClose'),
+  // Version display
+  versionDisplay: document.getElementById('versionDisplay'),
+  // Emoji search
+  emojiSearch: document.getElementById('emojiSearch'),
+  // Note search
+  noteSearchBar: document.getElementById('noteSearchBar'),
+  noteSearchInput: document.getElementById('noteSearchInput'),
+  noteSearchResults: document.getElementById('noteSearchResults'),
+  noteSearchPrev: document.getElementById('noteSearchPrev'),
+  noteSearchNext: document.getElementById('noteSearchNext'),
+  noteSearchClose: document.getElementById('noteSearchClose'),
+  // Import note input
+  importNoteInput: document.getElementById('importNoteInput'),
+  // Template project name
+  templateProjectName: document.getElementById('templateProjectName'),
+  // Custom theme elements
+  customThemeToggle: document.getElementById('customThemeToggle'),
+  customThemeEditor: document.getElementById('customThemeEditor'),
+  customThemeCss: document.getElementById('customThemeCss'),
+  applyCustomThemeBtn: document.getElementById('applyCustomThemeBtn'),
+  clearCustomThemeBtn: document.getElementById('clearCustomThemeBtn'),
+  // Theme color picker elements
+  colorBg: document.getElementById('colorBg'),
+  colorPanel: document.getElementById('colorPanel'),
+  colorText: document.getElementById('colorText'),
+  colorAccent: document.getElementById('colorAccent'),
+  colorBorder: document.getElementById('colorBorder'),
+  colorNoteBg: document.getElementById('colorNoteBg'),
+  applyThemeColorsBtn: document.getElementById('applyThemeColorsBtn'),
+  resetThemeColorsBtn: document.getElementById('resetThemeColorsBtn'),
 };
 
 const themeChipButtons = Array.from(document.querySelectorAll('.theme-chip'));
@@ -151,11 +199,14 @@ let templateManager;
 let exportFormatter;
 let spellcheckManager;
 let spellcheckRenderer;
+let noteTabManager;
 let currentSpellcheckWord = null; // Currently right-clicked misspelled word
 let isExportMenuOpen = false;
 let isMoreMenuOpen = false;
 const notesManager = new NotesManager();
 let saveIndicatorTimeout = null;
+let imageManager = null; // ImageManager instance for image support
+let dictationManager = null; // DictationManager instance for speech-to-text
 
 /**
  * Announce message to screen readers via ARIA live regions
@@ -174,6 +225,47 @@ function announce(message, priority = 'polite') {
   setTimeout(() => {
     liveRegion.textContent = message;
   }, 100);
+}
+
+let errorToastTimeout = null;
+
+/**
+ * Show error toast notification
+ * @param {string} message - Error message to display
+ * @param {number} duration - Auto-hide duration in ms (default 5000, 0 for no auto-hide)
+ */
+function showErrorToast(message, duration = 5000) {
+  if (!elements.errorToast || !elements.errorToastMessage) return;
+
+  // Clear any existing timeout
+  if (errorToastTimeout) {
+    clearTimeout(errorToastTimeout);
+    errorToastTimeout = null;
+  }
+
+  elements.errorToastMessage.textContent = message;
+  elements.errorToast.classList.remove('hidden');
+  elements.errorToast.setAttribute('aria-hidden', 'false');
+
+  // Auto-hide after duration
+  if (duration > 0) {
+    errorToastTimeout = setTimeout(hideErrorToast, duration);
+  }
+}
+
+/**
+ * Hide error toast notification
+ */
+function hideErrorToast() {
+  if (!elements.errorToast) return;
+
+  elements.errorToast.classList.add('hidden');
+  elements.errorToast.setAttribute('aria-hidden', 'true');
+
+  if (errorToastTimeout) {
+    clearTimeout(errorToastTimeout);
+    errorToastTimeout = null;
+  }
 }
 
 async function init() {
@@ -241,23 +333,92 @@ async function init() {
     }
   });
 
-  // Initialize spellcheck manager
-  try {
-    await spellcheckManager.initialize();
-  } catch (error) {
+  // Initialize spellcheck manager asynchronously (non-blocking for faster startup)
+  spellcheckManager.initialize().catch(error => {
     console.error('Failed to initialize spellcheck:', error);
+    // Disable spellcheck toggle if initialization failed
+    if (elements.spellcheckToggle) {
+      elements.spellcheckToggle.disabled = true;
+      elements.spellcheckToggle.title = 'Spellcheck unavailable - dictionary failed to load';
+    }
+  });
+
+  // Initialize dictation manager (only in side panel or if button exists)
+  if (elements.dictateButton) {
+    initDictation();
   }
+
+  // Initialize note tab manager
+  noteTabManager = new NoteTabManager({
+    stateManager,
+    notesManager,
+    confirmationDialog,
+    elements: {
+      noteTabList: elements.noteTabList,
+      noteTabs: elements.noteTabs,
+      noteArea: elements.noteArea,
+      addNoteTab: elements.addNoteTab
+    },
+    callbacks: {
+      announce,
+      updateWordCount,
+      updateActiveNoteContent,
+      renderImageGallery,
+      clearSpellcheck: () => spellcheckRenderer?.clear(),
+      recheckSpelling: () => {
+        if (spellcheckManager?.isEnabled()) {
+          spellcheckManager.checkText(true);
+        } else if (spellcheckRenderer) {
+          spellcheckRenderer.clear();
+        }
+      },
+      onTabContextMenu: showTabContextMenu
+    }
+  });
+  noteTabManager.init();
 
   renderEmojiButtons();
   await loadCustomTemplates();
   renderTemplates();
   bindEvents();
+  initImageManager(); // Initialize image paste/drop support
   await hydrateState();
+  // Load and apply previously saved custom theme CSS
+  loadCustomThemeCss();
+  // Load and apply previously saved theme colors
+  loadThemeColors();
   // Populate more menu for responsive layout
   populateMoreMenu();
+  // Initialize IndexedDB for images and render gallery
+  await ImageStorage.init();
+  await renderImageGallery();
+  // Show combined storage usage
+  await updateCombinedStorageUsage();
 
   // Listen for window resize in floating windows
   window.addEventListener('resize', handleWindowResize);
+
+  // Save state immediately when popup closes to prevent data loss
+  window.addEventListener('beforeunload', handleBeforeUnload);
+  window.addEventListener('pagehide', handleBeforeUnload);
+
+  // Set version display from manifest
+  if (elements.versionDisplay) {
+    elements.versionDisplay.textContent = 'v' + (chrome.runtime.getManifest().version || '1.2.0');
+  }
+
+  // Listen for system color scheme changes
+  setupSystemThemeListener();
+}
+
+/**
+ * Handle popup close - force immediate save of pending state
+ */
+function handleBeforeUnload() {
+  // Force immediate save without debounce
+  if (stateManager) {
+    stateManager.saveImmediate();
+  }
 }
 
 let resizeDebounceTimer = null;
@@ -313,8 +474,8 @@ function populateMoreMenu() {
         case 'templateButton':
           panelManager.toggle('template');
           break;
-        case 'syncButton':
-          panelManager.toggle('sync');
+        case 'importNoteButton':
+          importNoteFromFile();
           break;
       }
 
@@ -323,6 +484,18 @@ function populateMoreMenu() {
 
     moreMenu.appendChild(clone);
   });
+
+  // Add import note as a dedicated item (not a collapsible button)
+  const importBtn = document.createElement('button');
+  importBtn.type = 'button';
+  importBtn.className = 'more-menu-item toolbar-btn';
+  importBtn.innerHTML = '<i class="codicon codicon-file-add" aria-hidden="true"></i><span class="label">Import Note</span>';
+  importBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    importNoteFromFile();
+    closeMoreMenu();
+  });
+  moreMenu.appendChild(importBtn);
 }
 
 function toggleMoreMenu() {
@@ -334,6 +507,14 @@ function toggleMoreMenu() {
   elements.moreButton.setAttribute('aria-expanded', String(isMoreMenuOpen));
   elements.moreMenu.classList.toggle('hidden', !isMoreMenuOpen);
   elements.moreMenu.setAttribute('aria-hidden', String(!isMoreMenuOpen));
+
+  // Focus first item when opening
+  if (isMoreMenuOpen) {
+    const firstItem = elements.moreMenu.querySelector('.more-menu-item');
+    if (firstItem) {
+      firstItem.focus();
+    }
+  }
 }
 
 function closeMoreMenu() {
@@ -345,6 +526,52 @@ function closeMoreMenu() {
   elements.moreButton.setAttribute('aria-expanded', 'false');
   elements.moreMenu.classList.add('hidden');
   elements.moreMenu.setAttribute('aria-hidden', 'true');
+}
+
+/**
+ * Handle keyboard navigation in more menu
+ */
+function handleMoreMenuKeyDown(event) {
+  if (!isMoreMenuOpen) return;
+
+  const menuItems = Array.from(elements.moreMenu.querySelectorAll('.more-menu-item'));
+  const currentIndex = menuItems.indexOf(document.activeElement);
+
+  switch (event.key) {
+    case 'ArrowDown':
+      event.preventDefault();
+      if (currentIndex < menuItems.length - 1) {
+        menuItems[currentIndex + 1].focus();
+      } else {
+        menuItems[0].focus(); // Wrap to first
+      }
+      break;
+    case 'ArrowUp':
+      event.preventDefault();
+      if (currentIndex > 0) {
+        menuItems[currentIndex - 1].focus();
+      } else {
+        menuItems[menuItems.length - 1].focus(); // Wrap to last
+      }
+      break;
+    case 'Home':
+      event.preventDefault();
+      menuItems[0]?.focus();
+      break;
+    case 'End':
+      event.preventDefault();
+      menuItems[menuItems.length - 1]?.focus();
+      break;
+    case 'Escape':
+      event.preventDefault();
+      closeMoreMenu();
+      elements.moreButton.focus();
+      break;
+    case 'Tab':
+      // Close menu when tabbing out
+      closeMoreMenu();
+      break;
+  }
 }
 
 function renderEmojiButtons() {
@@ -457,7 +684,9 @@ function populateExportTemplateSelector() {
 
 function handleTemplateSelect(templateId) {
   try {
-    const content = templateManager.applyTemplate(templateId);
+    const projectName = elements.templateProjectName?.value?.trim() || '';
+    const variables = projectName ? { PROJECT_NAME: projectName } : {};
+    const content = templateManager.applyTemplate(templateId, variables);
     elements.noteArea.value = content;
     handleNoteChange({ target: elements.noteArea });
     panelManager.close('template');
@@ -471,8 +700,7 @@ function handleTemplateSelect(templateId) {
 
 async function loadCustomTemplates() {
   try {
-    const result = await chrome.storage.local.get('customTemplates');
-    const customTemplates = result.customTemplates || [];
+    const customTemplates = await StorageRepository.getCustomTemplates();
     templateManager.loadCustomTemplates(customTemplates);
   } catch (error) {
     console.warn('Hyperscribe: failed to load custom templates', error);
@@ -482,7 +710,7 @@ async function loadCustomTemplates() {
 async function saveCustomTemplates() {
   try {
     const customTemplates = templateManager.getCustomTemplates();
-    await chrome.storage.local.set({ customTemplates });
+    await StorageRepository.saveCustomTemplates(customTemplates);
   } catch (error) {
     console.warn('Hyperscribe: failed to save custom templates', error);
   }
@@ -601,10 +829,11 @@ function handleExportTemplates() {
 }
 
 function openExportTemplateDialog() {
-  const allTemplates = templateManager.getTemplates();
+  // Only export custom templates, not built-in ones
+  const customTemplates = templateManager.getCustomTemplates();
 
-  if (allTemplates.length === 0) {
-    announce('No templates to export', 'assertive');
+  if (customTemplates.length === 0) {
+    announce('No custom templates to export', 'assertive');
     return;
   }
 
@@ -613,8 +842,8 @@ function openExportTemplateDialog() {
     return;
   }
 
-  // Populate the template list with all templates
-  renderExportTemplateList(allTemplates);
+  // Populate the template list with custom templates only
+  renderExportTemplateList(customTemplates);
 
   // Reset select all checkbox
   if (elements.exportTemplateSelectAll) {
@@ -660,7 +889,11 @@ function renderExportTemplateList(templates) {
 
     const name = document.createElement('span');
     name.className = 'export-template-item-name';
-    name.innerHTML = `<span>${template.icon}</span> ${template.name}`;
+    // Use DOM methods to prevent XSS
+    const iconSpan = document.createElement('span');
+    iconSpan.textContent = template.icon;
+    name.appendChild(iconSpan);
+    name.appendChild(document.createTextNode(' ' + template.name));
 
     const desc = document.createElement('span');
     desc.className = 'export-template-item-desc';
@@ -692,8 +925,8 @@ function performExportSelectedTemplates() {
   }
 
   const selectedIds = Array.from(checkboxes).map(cb => cb.dataset.templateId);
-  const allTemplates = templateManager.getTemplates();
-  const selectedTemplates = allTemplates.filter(t => selectedIds.includes(t.id));
+  const customTemplates = templateManager.getCustomTemplates();
+  const selectedTemplates = customTemplates.filter(t => selectedIds.includes(t.id));
 
   if (selectedTemplates.length === 0) {
     announce('No templates selected', 'assertive');
@@ -727,25 +960,70 @@ function performExportSelectedTemplates() {
   announce(`Exported ${selectedTemplates.length} template${selectedTemplates.length === 1 ? '' : 's'}`);
 }
 
+// Validation constants for imports
+const IMPORT_LIMITS = {
+  MAX_TEMPLATE_NAME_LENGTH: 100,
+  MAX_TEMPLATE_CONTENT_LENGTH: 50000,
+  MAX_TEMPLATE_DESCRIPTION_LENGTH: 500,
+  MAX_TEMPLATE_ICON_LENGTH: 10,
+  MAX_TEMPLATES_COUNT: 100,
+  MAX_FILE_SIZE: 5 * 1024 * 1024 // 5MB
+};
+
 async function handleImportTemplates(event) {
   const file = event.target.files?.[0];
   if (!file) return;
+
+  // Validate file size
+  if (file.size > IMPORT_LIMITS.MAX_FILE_SIZE) {
+    announce('File too large. Maximum size is 5MB.', 'assertive');
+    event.target.value = '';
+    return;
+  }
 
   showSaveIndicator('Importing...');
 
   try {
     const text = await file.text();
-    const data = JSON.parse(text);
+    let data;
+
+    try {
+      data = JSON.parse(text);
+    } catch (parseError) {
+      throw new Error('Invalid JSON format. Please check the file contents.');
+    }
+
+    // Validate data is an object
+    if (!data || typeof data !== 'object') {
+      throw new Error('Invalid file format. Expected JSON object.');
+    }
 
     // Validate structure
     if (!data.templates || !Array.isArray(data.templates)) {
-      throw new Error('Invalid template file format');
+      throw new Error('Invalid template file format. Missing templates array.');
     }
 
-    // Validate each template
+    // Limit number of templates
+    if (data.templates.length > IMPORT_LIMITS.MAX_TEMPLATES_COUNT) {
+      throw new Error(`Too many templates. Maximum is ${IMPORT_LIMITS.MAX_TEMPLATES_COUNT}.`);
+    }
+
+    // Validate each template with length limits
     const validTemplates = data.templates.filter(t => {
-      return t.name && typeof t.name === 'string' &&
-             t.content && typeof t.content === 'string';
+      // Basic type checks
+      if (!t || typeof t !== 'object') return false;
+      if (!t.name || typeof t.name !== 'string') return false;
+      if (!t.content || typeof t.content !== 'string') return false;
+
+      // Length validation
+      if (t.name.length === 0 || t.name.length > IMPORT_LIMITS.MAX_TEMPLATE_NAME_LENGTH) return false;
+      if (t.content.length > IMPORT_LIMITS.MAX_TEMPLATE_CONTENT_LENGTH) return false;
+
+      // Optional field validation
+      if (t.description && (typeof t.description !== 'string' || t.description.length > IMPORT_LIMITS.MAX_TEMPLATE_DESCRIPTION_LENGTH)) return false;
+      if (t.icon && (typeof t.icon !== 'string' || t.icon.length > IMPORT_LIMITS.MAX_TEMPLATE_ICON_LENGTH)) return false;
+
+      return true;
     });
 
     if (validTemplates.length === 0) {
@@ -799,177 +1077,6 @@ async function handleImportTemplates(event) {
   }
 }
 
-function renderNoteTabs() {
-  const state = stateManager.getState();
-  const notes = state.notes || [];
-  const activeId = state.activeNoteId || (notes.length > 0 ? notes[0].id : null);
-
-  if (!elements.noteTabList) {
-    return;
-  }
-
-  elements.noteTabList.innerHTML = '';
-
-  if (notes.length === 0) {
-    // Hide tab bar if no notes
-    if (elements.noteTabs) {
-      elements.noteTabs.style.display = 'none';
-    }
-    return;
-  }
-
-  // Show tab bar
-  if (elements.noteTabs) {
-    elements.noteTabs.style.display = 'flex';
-  }
-
-  const fragment = document.createDocumentFragment();
-
-  notes.forEach(note => {
-    const tab = document.createElement('button');
-    tab.type = 'button';
-    tab.className = 'note-tab';
-    tab.dataset.noteId = note.id;
-    tab.setAttribute('role', 'tab');
-    tab.setAttribute('aria-selected', note.id === activeId ? 'true' : 'false');
-
-    if (note.id === activeId) {
-      tab.classList.add('active');
-    }
-
-    const title = document.createElement('span');
-    title.className = 'note-tab-title';
-    title.textContent = note.title || 'Untitled Note';
-
-    const closeBtn = document.createElement('button');
-    closeBtn.type = 'button';
-    closeBtn.className = 'note-tab-close';
-    closeBtn.setAttribute('aria-label', `Close ${note.title || 'note'}`);
-    closeBtn.innerHTML = '<i class="codicon codicon-close" aria-hidden="true"></i>';
-    closeBtn.addEventListener('click', e => {
-      e.stopPropagation();
-      handleCloseNoteTab(note.id);
-    });
-
-    tab.appendChild(title);
-    tab.appendChild(closeBtn);
-    tab.addEventListener('click', () => handleSwitchNoteTab(note.id));
-
-    fragment.appendChild(tab);
-  });
-
-  elements.noteTabList.appendChild(fragment);
-}
-
-function handleSwitchNoteTab(noteId) {
-  const state = stateManager.getState();
-  const note = state.notes?.find(n => n.id === noteId);
-
-  if (!note) {
-    return;
-  }
-
-  // Save current note content before switching
-  const currentContent = elements.noteArea.value;
-  updateActiveNoteContent(currentContent);
-
-  // Switch to new note
-  stateManager.save({ activeNoteId: noteId });
-  elements.noteArea.value = note.content || '';
-  updateWordCount(note.content || '');
-  renderNoteTabs();
-  // Re-check spelling for the new tab content
-  if (spellcheckManager && spellcheckManager.isEnabled()) {
-    spellcheckManager.checkText(true);
-  } else if (spellcheckRenderer) {
-    spellcheckRenderer.clear();
-  }
-  elements.noteArea.focus();
-  announce(`Switched to ${note.title}`);
-}
-
-function handleAddNoteTab() {
-  const newNote = notesManager.createNote('', '');
-  const state = stateManager.getState();
-  const notes = state.notes || [];
-
-  const updatedNotes = [...notes, newNote];
-  stateManager.save({
-    notes: updatedNotes,
-    activeNoteId: newNote.id
-  });
-
-  elements.noteArea.value = '';
-  updateWordCount('');
-  // Clear spellcheck highlights for new tab
-  if (spellcheckRenderer) {
-    spellcheckRenderer.clear();
-  }
-  renderNoteTabs();
-  elements.noteArea.focus();
-  announce('New note created');
-}
-
-function handleCloseNoteTab(noteId) {
-  const state = stateManager.getState();
-  const notes = state.notes || [];
-  const note = notes.find(n => n.id === noteId);
-
-  if (!note) {
-    return;
-  }
-
-  // Prevent closing if it's the last note
-  if (notes.length === 1) {
-    announce('Cannot close the last note', 'assertive');
-    return;
-  }
-
-  // Check if user wants confirmation
-  if (!state.suppressTabCloseConfirm) {
-    confirmationDialog.show({
-      message: `Close note "${note.title}"? This action cannot be undone.`,
-      confirmLabel: 'Close Note',
-      onConfirm: context => {
-        if (context.suppressFutureConfirms) {
-          stateManager.save({ suppressTabCloseConfirm: true });
-        }
-        performCloseNoteTab(noteId);
-      },
-      includeDontAsk: true
-    });
-    return;
-  }
-
-  performCloseNoteTab(noteId);
-}
-
-function performCloseNoteTab(noteId) {
-  const state = stateManager.getState();
-  const notes = state.notes || [];
-  const updatedNotes = notes.filter(n => n.id !== noteId);
-  let newActiveId = state.activeNoteId;
-
-  // If we're closing the active note, switch to another
-  if (noteId === state.activeNoteId) {
-    const currentIndex = notes.findIndex(n => n.id === noteId);
-    const nextNote =
-      updatedNotes[currentIndex] || updatedNotes[currentIndex - 1] || updatedNotes[0];
-    newActiveId = nextNote.id;
-    elements.noteArea.value = nextNote.content || '';
-    updateWordCount(nextNote.content || '');
-  }
-
-  const note = notes.find(n => n.id === noteId);
-  stateManager.save({
-    notes: updatedNotes,
-    activeNoteId: newActiveId
-  });
-
-  renderNoteTabs();
-  announce(`Note "${note.title}" closed`);
-}
-
 async function hydrateState() {
   const state = await stateManager.init();
   applyStateToUI(state);
@@ -988,6 +1095,12 @@ function toggleExportMenu(event) {
   elements.exportMenu.setAttribute('aria-hidden', 'false');
   elements.downloadButton.setAttribute('aria-expanded', 'true');
   isExportMenuOpen = true;
+
+  // Focus first menu item for keyboard navigation
+  const firstOption = elements.exportMenu.querySelector('.export-option');
+  if (firstOption) {
+    firstOption.focus();
+  }
 }
 
 function closeExportMenu() {
@@ -998,6 +1111,56 @@ function closeExportMenu() {
   elements.exportMenu.setAttribute('aria-hidden', 'true');
   elements.downloadButton.setAttribute('aria-expanded', 'false');
   isExportMenuOpen = false;
+}
+
+/**
+ * Handle keyboard navigation in export menu
+ */
+function handleExportMenuKeyDown(event) {
+  if (!isExportMenuOpen) return;
+
+  const menuItems = Array.from(elements.exportMenu.querySelectorAll('.export-option'));
+  const currentIndex = menuItems.indexOf(document.activeElement);
+
+  switch (event.key) {
+    case 'ArrowDown':
+      event.preventDefault();
+      if (currentIndex < menuItems.length - 1) {
+        menuItems[currentIndex + 1].focus();
+      } else {
+        menuItems[0].focus(); // Wrap to first
+      }
+      break;
+    case 'ArrowUp':
+      event.preventDefault();
+      if (currentIndex > 0) {
+        menuItems[currentIndex - 1].focus();
+      } else {
+        menuItems[menuItems.length - 1].focus(); // Wrap to last
+      }
+      break;
+    case 'Home':
+      event.preventDefault();
+      menuItems[0]?.focus();
+      break;
+    case 'End':
+      event.preventDefault();
+      menuItems[menuItems.length - 1]?.focus();
+      break;
+    case 'Escape':
+      event.preventDefault();
+      closeExportMenu();
+      elements.downloadButton.focus();
+      break;
+    case 'Enter':
+    case ' ':
+      // Let the click handler handle it
+      break;
+    case 'Tab':
+      // Close menu when tabbing out
+      closeExportMenu();
+      break;
+  }
 }
 
 function handleExportMenuClick(event) {
@@ -1033,7 +1196,7 @@ function handleDocumentClickForMenus(event) {
   }
 }
 
-function exportNote(format, { silent = false } = {}) {
+async function exportNote(format, { silent = false } = {}) {
   let content = elements.noteArea.value;
 
   // Check if a template is selected for export
@@ -1048,16 +1211,31 @@ function exportNote(format, { silent = false } = {}) {
   let formattedContent = content;
 
   switch (format) {
-    case 'md':
-      formattedContent = exportFormatter.formatAsMarkdown(content, metadata, true);
+    case 'md': {
+      // Include images as Markdown image references
+      const imageMd = await getImageMarkdownForExport();
+      const contentWithImages = content + (imageMd ? '\n\n' + imageMd : '');
+      formattedContent = exportFormatter.formatAsMarkdown(contentWithImages, metadata, true);
       break;
-    case 'html':
-      formattedContent = exportFormatter.formatAsHTML(content, metadata, true);
+    }
+    case 'html': {
+      // Include inline images in HTML export
+      const imageHtml = await getImageTagsForExport();
+      const contentWithImages = content + (imageHtml ? '\n' + imageHtml : '');
+      formattedContent = exportFormatter.formatAsHTML(contentWithImages, metadata, true);
       break;
-    default:
-      formattedContent = exportFormatter.formatAsText(content, metadata, true);
+    }
+    case 'pdf':
+      exportAsPdf(content, metadata, filename);
+      return; // PDF export is async via print dialog, returns immediately
+    default: {
+      // TXT export: embed images as base64 blocks at the end of the file
+      const imageBlocks = await getImageTextBlocks();
+      const contentWithImages = content + (imageBlocks ? '\n\n---\n\n' + imageBlocks : '');
+      formattedContent = exportFormatter.formatAsText(contentWithImages, metadata, true);
       format = 'txt';
       break;
+    }
   }
 
   download(filename, formattedContent, format).then(
@@ -1071,6 +1249,141 @@ function exportNote(format, { silent = false } = {}) {
       announce('Failed to download note', 'assertive');
     }
   );
+}
+
+/**
+ * Export note content as PDF via browser print-to-PDF.
+ * Opens the print dialog with the note rendered in a styled document,
+ * including any embedded images. The user selects "Save as PDF" in the dialog.
+ * @param {string} content - The note text content
+ * @param {Object} metadata - Note metadata (title, date, etc.)
+ * @param {string} filename - Suggested filename for the PDF
+ */
+async function exportAsPdf(content, metadata, filename) {
+  try {
+    // Build the print HTML with all styles inline
+    const title = metadata.title || 'Note';
+    const lines = content.split('\n');
+    const bodyHtml = lines.map(line => {
+      if (line.trim() === '') return '<p><br></p>';
+      return '<p>' + escapeHtml(line) + '</p>';
+    }).join('\n');
+
+    // Fetch images for this note and include them
+    const imageTags = await getImageTagsForExport();
+
+    const css = `@page { margin: 20mm; size: A4; }
+* { box-sizing: border-box; }
+body { font-family: 'Fira Code', 'Courier New', monospace; font-size: 12px; line-height: 1.6; color: #1a1a1a; background: #fff; padding: 20mm; margin: 0; }
+.pdf-header { border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 16px; }
+.pdf-header h1 { font-size: 18px; margin: 0 0 4px 0; color: #000; }
+.pdf-meta { font-size: 10px; color: #666; }
+.pdf-content p { margin: 0 0 4px 0; white-space: pre-wrap; word-wrap: break-word; }
+.pdf-content img { max-width: 100%; height: auto; margin: 8px 0; }
+@media print { body { padding: 0; } }`;
+
+    const html = '<!DOCTYPE html>\n<html lang="en">\n<head>\n<meta charset="utf-8"/>\n<title>' + escapeHtml(title) + '</title>\n<style>' + css + '</style>\n</head>\n<body>\n<div class="pdf-header">\n<h1>' + escapeHtml(title) + '</h1>\n<div class="pdf-meta">' + escapeHtml(metadata.date || new Date().toLocaleDateString()) + '</div>\n</div>\n<div class="pdf-content">' + bodyHtml + imageTags + '</div>\n<script>window.onload=function(){setTimeout(function(){window.print()},500)};window.onafterprint=function(){window.close()};<\/script>\n</body>\n</html>';
+
+    // Create a Blob and open in a new window (reliable across CSP contexts)
+    const blob = new Blob([html], { type: 'text/html' });
+    const blobUrl = URL.createObjectURL(blob);
+    const printWindow = window.open(blobUrl, '_blank', 'width=800,height=600,scrollbars=yes');
+
+    if (!printWindow) {
+      // Popup blocked - fallback: trigger download of the HTML file
+      announce('Popup blocked. Please allow popups for PDF export.', 'assertive');
+      // Try download as fallback
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename.replace(/\.pdf$/, '.html') + '.html';
+      a.click();
+    }
+
+    // Clean up the blob URL after the window loads
+    setTimeout(() => {
+      try { URL.revokeObjectURL(blobUrl); } catch(e) {}
+    }, 10000);
+
+    announce('Opening print dialog for PDF export...');
+  } catch (error) {
+    console.warn('Hyperscribe: PDF export failed', error);
+    announce('Failed to open PDF export', 'assertive');
+  }
+}
+
+/**
+ * Get HTML img tags for all images attached to the current note
+ * @returns {Promise<string>} HTML string of img tags
+ */
+async function getImageTagsForExport() {
+  try {
+    const state = stateManager.getState();
+    const activeNote = getActiveNoteState(state)?.note;
+    if (!activeNote?.imageIds || activeNote.imageIds.length === 0) return '';
+    const images = await ImageStorage.getImagesForNote(activeNote.id);
+    if (!images || images.length === 0) return '';
+    return images.map(img => '<img src="' + img.dataUri + '" alt="Attached image" style="max-width:100%;height:auto;margin:8px 0;" />').join('\n');
+  } catch (e) {
+    console.warn('Hyperscribe: could not load images for export', e);
+    return '';
+  }
+}
+
+/**
+ * Get Markdown image references for all images attached to the current note
+ * @returns {Promise<string>} Markdown string of image references
+ */
+async function getImageMarkdownForExport() {
+  try {
+    const state = stateManager.getState();
+    const activeNote = getActiveNoteState(state)?.note;
+    if (!activeNote?.imageIds || activeNote.imageIds.length === 0) return '';
+    const images = await ImageStorage.getImagesForNote(activeNote.id);
+    if (!images || images.length === 0) return '';
+    return images.map((img, i) => '![Image ' + (i + 1) + '](' + img.dataUri + ')').join('\n\n');
+  } catch (e) {
+    console.warn('Hyperscribe: could not load images for markdown export', e);
+    return '';
+  }
+}
+
+/**
+ * Get images embedded as base64 text blocks for TXT export
+ * Each image is appended as a labeled base64 block at the end of the text file
+ * @returns {Promise<string>} Formatted image blocks or empty string
+ */
+async function getImageTextBlocks() {
+  try {
+    const state = stateManager.getState();
+    const activeNote = getActiveNoteState(state)?.note;
+    if (!activeNote?.imageIds || activeNote.imageIds.length === 0) return '';
+    const images = await ImageStorage.getImagesForNote(activeNote.id);
+    if (!images || images.length === 0) return '';
+    return images.map((img, i) => {
+      const ext = img.dataUri?.startsWith('data:image/png') ? 'png'
+        : img.dataUri?.startsWith('data:image/jpeg') || img.dataUri?.startsWith('data:image/jpg') ? 'jpg'
+        : img.dataUri?.startsWith('data:image/gif') ? 'gif'
+        : img.dataUri?.startsWith('data:image/webp') ? 'webp'
+        : 'png';
+      const label = '[Image ' + (i + 1) + ' (' + ext + ')]';
+      const dataUri = img.dataUri || '';
+      return label + '\n' + dataUri;
+    }).join('\n\n');
+  } catch (e) {
+    console.warn('Hyperscribe: could not load images for text export', e);
+    return '';
+  }
+}
+
+/**
+ * Escape HTML special characters for safe insertion into HTML
+ * @param {string} text
+ * @returns {string}
+ */
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
 }
 
 function applyExportTemplate(noteContent, templateId) {
@@ -1215,6 +1528,39 @@ function updateWordCount(content = elements.noteArea?.value ?? '') {
   elements.wordCount.textContent = `Words: ${stats.words} | Characters: ${stats.characters}`;
 }
 
+/**
+ * Update storage display to include both chrome.storage and IndexedDB
+ */
+async function updateCombinedStorageUsage() {
+  if (!elements.storageUsage) return;
+  try {
+    const chromeStats = await StorageRepository.getStorageUsage();
+    let imageStats = { estimatedBytes: 0, count: 0 };
+    try {
+      imageStats = await ImageStorage.getStorageStats();
+    } catch (e) {
+      // IndexedDB might not be initialized yet
+    }
+
+    const totalBytes = chromeStats.bytes + imageStats.estimatedBytes;
+    const totalUsage = StorageRepository.formatBytes(totalBytes);
+    const imgSuffix = imageStats.count > 0 ? ` (${imageStats.count} imgs)` : '';
+    elements.storageUsage.textContent = `Storage: ${totalUsage}${imgSuffix}`;
+
+    // Remove previous warning classes
+    elements.storageUsage.classList.remove('storage-warning', 'storage-critical');
+
+    const totalPct = totalBytes / StorageRepository.STORAGE_QUOTA;
+    if (totalPct >= StorageRepository.QUOTA_CRITICAL_THRESHOLD) {
+      elements.storageUsage.classList.add('storage-critical');
+    } else if (totalPct >= StorageRepository.QUOTA_WARNING_THRESHOLD) {
+      elements.storageUsage.classList.add('storage-warning');
+    }
+  } catch (error) {
+    // Fallback to chrome storage only display
+  }
+}
+
 function handleExportSettings() {
   try {
     const data = stateManager.exportSettings();
@@ -1244,11 +1590,30 @@ function handleImportSettings(event) {
     return;
   }
 
+  // Validate file size
+  if (file.size > IMPORT_LIMITS.MAX_FILE_SIZE) {
+    announce('File too large. Maximum size is 5MB.', 'assertive');
+    if (input) input.value = '';
+    return;
+  }
+
   const reader = new FileReader();
   reader.onload = async () => {
     try {
       const text = String(reader.result ?? '');
-      const parsed = JSON.parse(text);
+      let parsed;
+
+      try {
+        parsed = JSON.parse(text);
+      } catch (parseError) {
+        throw new Error('Invalid JSON format');
+      }
+
+      // Basic structure validation
+      if (!parsed || typeof parsed !== 'object') {
+        throw new Error('Invalid settings format');
+      }
+
       const result = await stateManager.importSettings(parsed);
 
       if (result.success) {
@@ -1260,7 +1625,7 @@ function handleImportSettings(event) {
       }
     } catch (error) {
       console.warn('Hyperscribe: settings import failed', error);
-      announce('Invalid or corrupted settings file', 'assertive');
+      announce(error.message || 'Invalid or corrupted settings file', 'assertive');
     } finally {
       if (input) {
         input.value = '';
@@ -1315,18 +1680,27 @@ function getActiveNoteState(state) {
   };
 }
 
+/**
+ * Update the active note content in state
+ * @param {string} content - The new note content
+ * @returns {boolean} - Whether the title changed (for tab re-rendering)
+ */
 function updateActiveNoteContent(content) {
   const state = stateManager.getState();
 
   if (Array.isArray(state.notes) && state.notes.length > 0) {
     const { note: activeNote, activeId } = getActiveNoteState(state);
     const nextId = activeId || activeNote.id;
+    const newTitle = NotesManager.extractTitle(content);
+    const oldTitle = activeNote?.title || '';
+    const titleChanged = newTitle !== oldTitle;
+
     const updatedNotes = state.notes.map(note => {
       if (note.id === nextId) {
         return {
           ...note,
           content,
-          title: NotesManager.extractTitle(content),
+          title: newTitle,
           modified: Date.now()
         };
       }
@@ -1339,7 +1713,7 @@ function updateActiveNoteContent(content) {
       note: content,
       lastModified: Date.now()
     });
-    return;
+    return titleChanged;
   }
 
   const fallbackNote = notesManager.createNote('', content);
@@ -1349,6 +1723,7 @@ function updateActiveNoteContent(content) {
     note: content,
     lastModified: Date.now()
   });
+  return true; // New note, always render tabs
 }
 
 function applyStateToUI(state) {
@@ -1394,7 +1769,7 @@ function applyStateToUI(state) {
   }
 
   updateWordCount(elements.noteArea.value);
-  renderNoteTabs();
+  noteTabManager.render();
   hideSaveIndicator({ delay: 0, message: '' });
 }
 
@@ -1430,15 +1805,32 @@ function bindEvents() {
     elements.exportTemplateDialogConfirm.addEventListener('click', performExportSelectedTemplates);
   elements.exportTemplateSelectAll &&
     elements.exportTemplateSelectAll.addEventListener('change', handleExportTemplateSelectAll);
-  // Note tab events
-  elements.addNoteTab && elements.addNoteTab.addEventListener('click', handleAddNoteTab);
+  // Note tab events are now handled by NoteTabManager.init()
   elements.downloadButton.addEventListener('click', toggleExportMenu);
   elements.exportMenu.addEventListener('click', handleExportMenuClick);
+  elements.exportMenu.addEventListener('keydown', handleExportMenuKeyDown);
   elements.clearStorageButton.addEventListener('click', clearStoredData);
-  elements.floatWindowButton &&
-    elements.floatWindowButton.addEventListener('click', openFloatingWindow);
+  // Float window button archived — event binding removed
+  elements.openSidePanelButton &&
+    elements.openSidePanelButton.addEventListener('click', openSidePanel);
   elements.feedbackButton &&
     elements.feedbackButton.addEventListener('click', openFeedbackEmail);
+  elements.errorToastClose &&
+    elements.errorToastClose.addEventListener('click', hideErrorToast);
+
+  // Custom theme events
+  elements.customThemeToggle &&
+    elements.customThemeToggle.addEventListener('click', toggleCustomThemeEditor);
+  elements.applyCustomThemeBtn &&
+    elements.applyCustomThemeBtn.addEventListener('click', applyCustomThemeCss);
+  elements.clearCustomThemeBtn &&
+    elements.clearCustomThemeBtn.addEventListener('click', clearCustomThemeCss);
+  // Theme color picker events
+  elements.applyThemeColorsBtn &&
+    elements.applyThemeColorsBtn.addEventListener('click', applyThemeColors);
+  elements.resetThemeColorsBtn &&
+    elements.resetThemeColorsBtn.addEventListener('click', resetThemeColors);
+
   elements.noteArea.addEventListener('input', handleNoteChange);
   elements.noteArea.addEventListener('wheel', handleCtrlScroll, { passive: false });
 
@@ -1456,6 +1848,11 @@ function bindEvents() {
       e.stopPropagation();
       toggleMoreMenu();
     });
+  }
+
+  // More menu keyboard navigation
+  if (elements.moreMenu) {
+    elements.moreMenu.addEventListener('keydown', handleMoreMenuKeyDown);
   }
 
   // Close more menu when clicking outside
@@ -1481,6 +1878,32 @@ function bindEvents() {
     elements.importSettingsInput.addEventListener('change', handleImportSettings);
   document.addEventListener('keydown', handleGlobalKeyDown);
 
+  // Emoji search
+  elements.emojiSearch && elements.emojiSearch.addEventListener('input', handleEmojiSearch);
+
+  // Note search events
+  elements.noteSearchInput && elements.noteSearchInput.addEventListener('input', handleNoteSearchInput);
+  elements.noteSearchPrev && elements.noteSearchPrev.addEventListener('click', goToPrevMatch);
+  elements.noteSearchNext && elements.noteSearchNext.addEventListener('click', goToNextMatch);
+  elements.noteSearchClose && elements.noteSearchClose.addEventListener('click', closeNoteSearch);
+  // Close search on Escape when focused
+  elements.noteSearchInput && elements.noteSearchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      closeNoteSearch();
+    }
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (e.shiftKey) {
+        goToPrevMatch();
+      } else {
+        goToNextMatch();
+      }
+    }
+  });
+
+  // Import note from file
+  elements.importNoteInput && elements.importNoteInput.addEventListener('change', handleImportNote);
+
   // Listen for keyboard shortcut commands from background
   chrome.runtime.onMessage.addListener(handleCommandMessage);
 }
@@ -1488,6 +1911,8 @@ function bindEvents() {
 function handleStateChange(state) {
   updateWordCount(state?.note ?? elements.noteArea.value);
   hideSaveIndicator({ delay: 400, message: 'Saved' });
+  // Update storage usage after saves
+  updateCombinedStorageUsage();
 }
 
 function handleThemeChange(themeId) {
@@ -1495,6 +1920,176 @@ function handleThemeChange(themeId) {
   const theme = ThemeManager.THEMES[themeId];
   if (theme) {
     announce(`Theme changed to ${theme.label}`);
+  }
+}
+
+/**
+ * Toggle the custom theme CSS editor visibility
+ */
+/**
+ * Apply theme colors from the color pickers to the app element
+ * Sets CSS custom properties and saves to state
+ */
+function applyThemeColors() {
+  const colors = {
+    bg: elements.colorBg?.value || '',
+    panel: elements.colorPanel?.value || '',
+    text: elements.colorText?.value || '',
+    accent: elements.colorAccent?.value || '',
+    border: elements.colorBorder?.value || '',
+    noteBg: elements.colorNoteBg?.value || ''
+  };
+
+  // Determine if current theme is dark or light based on app classes
+  const isDark = document.body.classList.contains('theme-dark');
+
+  // Remove any existing theme color style element
+  const existing = document.getElementById('custom-theme-colors');
+  if (existing) existing.remove();
+
+  // Build CSS custom properties string
+  const props = [];
+  if (colors.bg) props.push(isDark ? '--dark-bg: ' + colors.bg : '--light-bg: ' + colors.bg);
+  if (colors.panel) props.push(isDark ? '--dark-panel: ' + colors.panel : '--light-panel: ' + colors.panel);
+  if (colors.text) props.push(isDark ? '--dark-text: ' + colors.text : '--light-text: ' + colors.text);
+  if (colors.accent) props.push('--accent-primary: ' + colors.accent);
+  if (colors.border) props.push(isDark ? '--dark-border: ' + colors.border : '--light-border: ' + colors.border);
+  // Note background — applied to the note container that the textarea lives in
+  if (colors.noteBg) props.push('--note-container-bg: ' + colors.noteBg);
+  if (colors.accent) {
+    // Generate muted variants from accent color
+    const hexToRgb = (hex) => {
+      const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+      return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : null;
+    };
+    const rgb = hexToRgb(colors.accent);
+    if (rgb) {
+      props.push('--accent-muted: rgba(' + rgb + ', 0.25)');
+      props.push('--accent-muted-strong: rgba(' + rgb + ', 0.4)');
+    }
+  }
+
+  if (props.length > 0) {
+    const style = document.createElement('style');
+    style.id = 'custom-theme-colors';
+    style.textContent = '#app, body {\n' + props.join(';\n') + ';\n}';
+    document.head.appendChild(style);
+  }
+
+  // Save to state
+  stateManager.save({ customThemeColors: colors });
+  announce('Theme colors applied');
+}
+
+/**
+ * Reset theme colors back to defaults
+ */
+function resetThemeColors() {
+  const existing = document.getElementById('custom-theme-colors');
+  if (existing) existing.remove();
+
+  // Reset inputs to default values
+  if (elements.colorBg) elements.colorBg.value = '#1e1e2e';
+  if (elements.colorPanel) elements.colorPanel.value = '#2a2a3c';
+  if (elements.colorText) elements.colorText.value = '#cdd6f4';
+  if (elements.colorAccent) elements.colorAccent.value = '#cba6f7';
+  if (elements.colorBorder) elements.colorBorder.value = '#cba6f7';
+  if (elements.colorNoteBg) elements.colorNoteBg.value = '#181825';
+
+  stateManager.save({ customThemeColors: null });
+  announce('Theme colors reset');
+}
+
+/**
+ * Load and apply saved theme colors from state
+ */
+function loadThemeColors() {
+  const state = stateManager.getState();
+  const colors = state.customThemeColors;
+  if (!colors) return;
+
+  // Set the color picker values
+  if (elements.colorBg && colors.bg) elements.colorBg.value = colors.bg;
+  if (elements.colorPanel && colors.panel) elements.colorPanel.value = colors.panel;
+  if (elements.colorText && colors.text) elements.colorText.value = colors.text;
+  if (elements.colorAccent && colors.accent) elements.colorAccent.value = colors.accent;
+  if (elements.colorBorder && colors.border) elements.colorBorder.value = colors.border;
+  if (elements.colorNoteBg && colors.noteBg) elements.colorNoteBg.value = colors.noteBg;
+
+  // Apply the colors
+  applyThemeColors();
+}
+
+function toggleCustomThemeEditor() {
+  const isHidden = elements.customThemeEditor.classList.toggle('hidden');
+  elements.customThemeToggle.setAttribute('aria-expanded', !isHidden);
+  elements.customThemeEditor.setAttribute('aria-hidden', isHidden);
+  if (!isHidden) {
+    elements.customThemeCss.focus();
+  }
+}
+
+/**
+ * Apply custom theme CSS from the textarea
+ * Injects a <style> element with the user's custom CSS properties
+ */
+function applyCustomThemeCss() {
+  const css = elements.customThemeCss?.value?.trim();
+  if (!css) {
+    announce('No custom CSS entered', 'assertive');
+    return;
+  }
+
+  try {
+    // Remove existing custom theme style if any
+    const existing = document.getElementById('custom-theme-style');
+    if (existing) existing.remove();
+
+    // Create and inject the custom style
+    const style = document.createElement('style');
+    style.id = 'custom-theme-style';
+    style.textContent = `#app, body {\n${css}\n}`;
+    document.head.appendChild(style);
+
+    // Save to state
+    stateManager.save({ customThemeCss: css });
+    announce('Custom theme applied');
+  } catch (error) {
+    console.warn('Hyperscribe: failed to apply custom CSS', error);
+    announce('Invalid CSS', 'assertive');
+  }
+}
+
+/**
+ * Clear custom theme CSS
+ */
+function clearCustomThemeCss() {
+  // Remove the custom style element
+  const existing = document.getElementById('custom-theme-style');
+  if (existing) existing.remove();
+
+  // Clear the textarea
+  if (elements.customThemeCss) {
+    elements.customThemeCss.value = '';
+  }
+
+  // Remove from state
+  stateManager.save({ customThemeCss: '' });
+  announce('Custom theme cleared');
+}
+
+/**
+ * Load and apply previously saved custom theme CSS
+ */
+function loadCustomThemeCss() {
+  const state = stateManager.getState();
+  const css = state.customThemeCss;
+  if (css && elements.customThemeCss) {
+    elements.customThemeCss.value = css;
+    const style = document.createElement('style');
+    style.id = 'custom-theme-style';
+    style.textContent = `#app, body {\n${css}\n}`;
+    document.head.appendChild(style);
   }
 }
 
@@ -1509,17 +2104,26 @@ function handleFontChange(fontState) {
 
 function handleNoteChange(event) {
   const value = event.target.value;
+
+  // Immediate visual feedback
   showSaveIndicator();
   updateWordCount(value);
-  updateActiveNoteContent(value);
-  renderNoteTabs();
 
-  // Trigger spellcheck if enabled
+  // State update (debounced internally by StateManager)
+  const titleChanged = updateActiveNoteContent(value);
+
+  // Debounce tab rendering separately - only re-render if title changed
+  if (titleChanged) {
+    noteTabManager.debouncedRender();
+  }
+
+  // Trigger spellcheck if enabled (already debounced internally)
   if (spellcheckManager && spellcheckManager.isEnabled()) {
     spellcheckManager.checkText();
   }
 }
 
+let fontSizeAnnounceTimeout = null;
 function handleCtrlScroll(event) {
   // Check for Ctrl+scroll (or Cmd+scroll on Mac)
   if (!event.ctrlKey && !event.metaKey) return;
@@ -1548,6 +2152,15 @@ function handleCtrlScroll(event) {
     if (spellcheckRenderer) {
       spellcheckRenderer.syncFontProperties();
     }
+
+    // Debounced screen reader announcement
+    if (fontSizeAnnounceTimeout) {
+      clearTimeout(fontSizeAnnounceTimeout);
+    }
+    fontSizeAnnounceTimeout = setTimeout(() => {
+      announce(`Font size: ${newSize}px`);
+      fontSizeAnnounceTimeout = null;
+    }, 500);
   }
 }
 
@@ -1722,16 +2335,27 @@ function renderDictionaryWords() {
     elements.dictionaryEmpty.classList.toggle('hidden', words.length > 0);
   }
 
-  // Render words
+  // Render words using DOM methods to prevent XSS
   words.sort().forEach(word => {
     const wordEl = document.createElement('span');
     wordEl.className = 'dictionary-word';
-    wordEl.innerHTML = `
-      ${word}
-      <button type="button" class="dictionary-word-remove" data-word="${word}" aria-label="Remove ${word}">
-        <i class="codicon codicon-close" aria-hidden="true"></i>
-      </button>
-    `;
+
+    // Use textContent for the word to prevent XSS
+    const wordText = document.createTextNode(word + ' ');
+    wordEl.appendChild(wordText);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'dictionary-word-remove';
+    removeBtn.dataset.word = word;
+    removeBtn.setAttribute('aria-label', `Remove ${word}`);
+
+    const icon = document.createElement('i');
+    icon.className = 'codicon codicon-close';
+    icon.setAttribute('aria-hidden', 'true');
+    removeBtn.appendChild(icon);
+
+    wordEl.appendChild(removeBtn);
     container.appendChild(wordEl);
   });
 
@@ -1788,6 +2412,27 @@ function handleGlobalKeyDown(event) {
   if (event.key === 'Escape' && isMoreMenuOpen) {
     closeMoreMenu();
     event.preventDefault();
+    return;
+  }
+
+  // Close note search bar on Escape
+  if (event.key === 'Escape' && elements.noteSearchBar && !elements.noteSearchBar.classList.contains('hidden')) {
+    closeNoteSearch();
+    event.preventDefault();
+    return;
+  }
+
+  // Close tab context menu on Escape
+  if (event.key === 'Escape' && tabContextMenu) {
+    hideTabContextMenu();
+    event.preventDefault();
+    return;
+  }
+
+  // Handle Ctrl+F for search
+  if ((event.ctrlKey || event.metaKey) && event.key === 'f') {
+    event.preventDefault();
+    openNoteSearch();
     return;
   }
 
@@ -1959,12 +2604,14 @@ function insertEmoji(emoji) {
 
 function clearStoredData() {
   confirmationDialog.show({
-    message: 'Reset all saved Hyperscribe data including note contents and preferences?',
+    message: 'Reset all saved Hyperscribe data including notes, images, and preferences?',
     confirmLabel: 'Clear Data',
     onConfirm: async () => {
       await stateManager.clear();
+      await ImageStorage.clearAll();
       const state = stateManager.getState();
       applyStateToUI(state);
+      announce('All data cleared');
     }
   });
 }
@@ -1992,25 +2639,71 @@ Browser: ${userAgent}
 }
 
 async function openFloatingWindow() {
-  // Try Document Picture-in-Picture first (always-on-top)
-  if ('documentPictureInPicture' in window) {
-    try {
-      await openPictureInPicture();
-      return;
-    } catch (error) {
-      console.warn('Document PiP failed, falling back to popup window:', error);
-    }
+  // Don't open another floating window if we're already in one
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('floating') === 'true') {
+    announce('Already in a floating window');
+    return;
   }
 
-  // Fallback to regular popup window using window.open
-  const state = stateManager.getState();
-  const width = state.windowSize?.width || 480;
-  const height = state.windowSize?.height || 600;
+  // Save state immediately in case the current context closes during/open after PiP setup
+  await stateManager.saveImmediate();
 
-  const popupUrl = chrome.runtime.getURL('popup.html') + '?floating=true';
-  const features = `width=${width},height=${height},resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no`;
+  // Try Document Picture-in-Picture first (true always-on-top)
+  if ('documentPictureInPicture' in window) {
+    try {
+      const pipWindow = await openPictureInPicture();
+      if (pipWindow) {
+        return;
+      }
+    } catch (error) {
+      console.warn('Hyperscribe: Document PiP failed:', error.message);
+    }
+  } else {
+    console.log('Hyperscribe: documentPictureInPicture API not available in this context');
+  }
 
-  window.open(popupUrl, 'hyperscribe-floating', features);
+  // Fallback 1: send message to background service worker for reliable window creation
+  try {
+    const state = stateManager.getState();
+    const width = state.windowSize?.width || 480;
+    const height = state.windowSize?.height || 600;
+
+    const response = await chrome.runtime.sendMessage({
+      type: 'openFloatingWindow',
+      width,
+      height
+    });
+
+    if (response?.success) {
+      announce('Opened floating window');
+      return;
+    }
+    console.warn('Hyperscribe: background window creation failed:', response?.error);
+  } catch (error) {
+    console.warn('Hyperscribe: background message failed:', error.message);
+  }
+
+  // Fallback 2: try chrome.windows.create directly
+  try {
+    await openFloatingWindowViaChromeApi();
+    return;
+  } catch (error) {
+    console.warn('Hyperscribe: chrome.windows.create fallback failed:', error.message);
+  }
+
+  // Fallback 3: window.open (may be blocked by popup blocker)
+  try {
+    openFloatingWindowViaWindowOpen();
+    return;
+  } catch (error) {
+    console.warn('Hyperscribe: window.open fallback failed:', error.message);
+  }
+
+  // Nothing worked — show help message
+  showErrorToast(
+    'Cannot open floating window. Try enabling popups for this extension, or use the Side Panel instead.'
+  );
 }
 
 async function openPictureInPicture() {
@@ -2025,18 +2718,20 @@ async function openPictureInPicture() {
     disallowReturnToOpener: false
   });
 
+  if (!pipWindow || pipWindow.closed) {
+    throw new Error('PiP window was not created');
+  }
+
   // Copy all stylesheets to PiP window
   const styleSheets = [...document.styleSheets];
   for (const sheet of styleSheets) {
     try {
       if (sheet.href) {
-        // External stylesheet - create link element
         const link = pipWindow.document.createElement('link');
         link.rel = 'stylesheet';
         link.href = sheet.href;
         pipWindow.document.head.appendChild(link);
       } else if (sheet.cssRules) {
-        // Inline stylesheet - copy rules
         const style = pipWindow.document.createElement('style');
         const cssText = [...sheet.cssRules].map(rule => rule.cssText).join('\n');
         style.textContent = cssText;
@@ -2137,6 +2832,52 @@ async function openPictureInPicture() {
   pipNoteArea.focus();
 
   announce('Opened in always-on-top window');
+  return pipWindow;
+}
+
+/**
+ * Open a floating popup window using the chrome.windows API.
+ * More reliable than window.open from extension popups.
+ */
+async function openFloatingWindowViaChromeApi() {
+  const state = stateManager.getState();
+  const width = state.windowSize?.width || 480;
+  const height = state.windowSize?.height || 600;
+
+  const popupUrl = chrome.runtime.getURL('popup.html') + '?floating=true';
+
+  const window = await chrome.windows.create({
+    url: popupUrl,
+    type: 'popup',
+    width: Math.min(width, 800),
+    height: Math.min(height, 600),
+    focused: true
+  });
+
+  if (!window) {
+    throw new Error('chrome.windows.create returned no window');
+  }
+
+  announce('Opened floating window');
+}
+
+/**
+ * Last-resort fallback using window.open.
+ */
+function openFloatingWindowViaWindowOpen() {
+  const state = stateManager.getState();
+  const width = state.windowSize?.width || 480;
+  const height = state.windowSize?.height || 600;
+
+  const popupUrl = chrome.runtime.getURL('popup.html') + '?floating=true';
+  const features = `width=${width},height=${height},resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no`;
+
+  const win = window.open(popupUrl, 'hyperscribe-floating', features);
+  if (!win) {
+    throw new Error('window.open returned null (likely blocked)');
+  }
+
+  announce('Opened floating window');
 }
 
 function startResize(event) {
@@ -2231,6 +2972,452 @@ function resetWindowSize() {
   stateManager.save({ windowSize: { width: defaultWidth, height: defaultHeight } });
 }
 
+// ============================================
+// Dictation (Speech-to-Text) Functions
+// ============================================
+
+/**
+ * Initialize dictation manager for speech-to-text
+ */
+function initDictation() {
+  if (!DictationManager.isSupported()) {
+    // Hide dictate button if not supported
+    if (elements.dictateButton) {
+      elements.dictateButton.style.display = 'none';
+    }
+    return;
+  }
+
+  dictationManager = new DictationManager({
+    textarea: elements.noteArea,
+    onStart: () => {
+      elements.dictateButton.setAttribute('aria-pressed', 'true');
+      elements.dictateButton.querySelector('.label').textContent = 'Stop';
+      announce('Dictation started. Speak now.', 'polite');
+    },
+    onEnd: () => {
+      elements.dictateButton.setAttribute('aria-pressed', 'false');
+      elements.dictateButton.querySelector('.label').textContent = 'Dictate';
+      announce('Dictation stopped.', 'polite');
+    },
+    onResult: (result) => {
+      // Update word count as text is added
+      // (Content is saved via the input event dispatched by DictationManager)
+      updateWordCount();
+    },
+    onError: (message) => {
+      showErrorToast(message);
+      announce(message, 'assertive');
+    }
+  });
+
+  // Bind dictate button click
+  elements.dictateButton.addEventListener('click', toggleDictation);
+}
+
+/**
+ * Toggle dictation on/off
+ */
+function toggleDictation() {
+  if (!dictationManager) {
+    showErrorToast('Speech recognition is not supported in this browser.');
+    return;
+  }
+
+  const isListening = dictationManager.toggle();
+  if (isListening) {
+    // Focus the textarea so speech results insert at cursor
+    elements.noteArea.focus();
+  } else {
+    // Stopped - check spelling on the new content
+    if (spellcheckManager?.isEnabled()) {
+      spellcheckManager.checkText(true);
+    }
+  }
+}
+
+/**
+ * Open side panel from popup
+ */
+async function openSidePanel() {
+  try {
+    const response = await chrome.runtime.sendMessage({ type: 'openSidePanel' });
+    if (response?.success) {
+      // Close popup after opening side panel
+      window.close();
+    } else {
+      showErrorToast('Failed to open side panel');
+    }
+  } catch (error) {
+    console.error('Failed to open side panel:', error);
+    showErrorToast('Failed to open side panel');
+  }
+}
+
+// ============================================
+// Image Support Functions
+// ============================================
+
+/**
+ * Initialize image manager for paste/drop support
+ */
+function initImageManager() {
+  // Handle paste events on the note area
+  elements.noteArea.addEventListener('paste', handleImagePaste);
+
+  // Handle drag and drop
+  elements.noteArea.addEventListener('dragover', (e) => {
+    if (e.dataTransfer?.types.includes('Files')) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+      elements.noteArea.classList.add('drag-over');
+    }
+  });
+
+  elements.noteArea.addEventListener('dragleave', () => {
+    elements.noteArea.classList.remove('drag-over');
+  });
+
+  elements.noteArea.addEventListener('drop', handleImageDrop);
+
+  // Add image button click handler
+  if (elements.addImageButton) {
+    elements.addImageButton.addEventListener('click', handleAddImageFromPicker);
+  }
+}
+
+/**
+ * Handle paste event for images
+ */
+async function handleImagePaste(event) {
+  const items = event.clipboardData?.items;
+  if (!items) return;
+
+  for (const item of items) {
+    if (item.type.startsWith('image/')) {
+      event.preventDefault();
+      const blob = item.getAsFile();
+      if (blob) {
+        await addImageToGallery(blob);
+      }
+      return;
+    }
+  }
+}
+
+/**
+ * Handle drop event for images
+ */
+async function handleImageDrop(event) {
+  event.preventDefault();
+  elements.noteArea.classList.remove('drag-over');
+
+  const files = event.dataTransfer?.files;
+  if (!files) return;
+
+  for (const file of files) {
+    if (file.type.startsWith('image/')) {
+      await addImageToGallery(file);
+    }
+  }
+}
+
+/**
+ * Handle adding image from file picker
+ */
+async function handleAddImageFromPicker() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.style.display = 'none';
+
+  input.addEventListener('change', async (event) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      await addImageToGallery(file);
+    }
+    input.remove();
+  });
+
+  document.body.appendChild(input);
+  input.click();
+}
+
+/**
+ * Add image to the gallery and IndexedDB
+ */
+async function addImageToGallery(blob) {
+  try {
+    showSaveIndicator('Adding image...');
+
+    // Compress and convert to data URI
+    const dataUri = await compressImage(blob);
+
+    // Generate unique ID
+    const imageId = `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    // Get current state and active note
+    const state = stateManager.getState();
+    const { activeId } = getActiveNoteState(state);
+
+    // Save image to IndexedDB
+    await ImageStorage.saveImage({
+      id: imageId,
+      noteId: activeId,
+      dataUri,
+      createdAt: Date.now()
+    });
+
+    // Update notes array with only the image reference (not the full dataUri)
+    const updatedNotes = (state.notes || []).map(note => {
+      if (note.id === activeId) {
+        return {
+          ...note,
+          imageIds: [...(note.imageIds || []), imageId],
+          modified: Date.now()
+        };
+      }
+      return note;
+    });
+
+    // Save state
+    stateManager.save({ notes: updatedNotes });
+
+    // Re-render gallery
+    await renderImageGallery();
+
+    announce('Image added');
+    showSaveIndicator('Saved');
+  } catch (error) {
+    console.error('Failed to add image:', error);
+    announce('Failed to add image', 'assertive');
+  }
+}
+
+/**
+ * Compress image to reduce storage size
+ */
+async function compressImage(blob) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(blob);
+
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+
+      // Calculate new dimensions (max 800px width)
+      const maxWidth = 800;
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth) {
+        const scale = maxWidth / width;
+        width = maxWidth;
+        height = Math.round(height * scale);
+      }
+
+      // Create canvas for compression
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Convert to JPEG for smaller size
+      const dataUri = canvas.toDataURL('image/jpeg', 0.8);
+      resolve(dataUri);
+    };
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      reject(new Error('Failed to load image'));
+    };
+
+    img.src = objectUrl;
+  });
+}
+
+/**
+ * Render the image gallery for the active note
+ * Loads images from IndexedDB
+ */
+async function renderImageGallery() {
+  const state = stateManager.getState();
+  const { activeId, note: activeNote } = getActiveNoteState(state);
+
+  // Support both old format (images array) and new format (imageIds array)
+  const imageIds = activeNote?.imageIds || [];
+  const legacyImages = activeNote?.images || [];
+
+  // Migrate legacy images if present
+  if (legacyImages.length > 0 && imageIds.length === 0) {
+    await migrateNoteLegacyImages(activeId, activeNote);
+    return; // migrateNoteLegacyImages will call renderImageGallery again
+  }
+
+  // Hide gallery if no images
+  if (imageIds.length === 0) {
+    elements.imageGallery?.classList.add('hidden');
+    return;
+  }
+
+  // Load images from IndexedDB
+  const images = await ImageStorage.getImagesForNote(activeId);
+
+  if (images.length === 0) {
+    elements.imageGallery?.classList.add('hidden');
+    return;
+  }
+
+  elements.imageGallery?.classList.remove('hidden');
+
+  // Clear existing thumbnails
+  if (elements.imageGalleryGrid) {
+    elements.imageGalleryGrid.innerHTML = '';
+
+    // Create thumbnail for each image
+    images.forEach(imageData => {
+      const item = document.createElement('div');
+      item.className = 'image-gallery-item';
+      item.dataset.imageId = imageData.id;
+
+      const img = document.createElement('img');
+      img.src = imageData.dataUri;
+      img.alt = 'Attached image';
+      img.loading = 'lazy';
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.type = 'button';
+      deleteBtn.innerHTML = '<i class="codicon codicon-close" aria-hidden="true"></i>';
+      deleteBtn.setAttribute('aria-label', 'Delete image');
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteImage(imageData.id);
+      });
+
+      // Click to view full size
+      img.addEventListener('click', () => viewImage(imageData.dataUri));
+
+      item.appendChild(img);
+      item.appendChild(deleteBtn);
+      elements.imageGalleryGrid.appendChild(item);
+    });
+  }
+}
+
+/**
+ * Migrate legacy embedded images to IndexedDB
+ */
+async function migrateNoteLegacyImages(noteId, note) {
+  if (!note.images || note.images.length === 0) return;
+
+  const imageIds = [];
+
+  for (const image of note.images) {
+    try {
+      await ImageStorage.saveImage({
+        id: image.id,
+        noteId: noteId,
+        dataUri: image.dataUri,
+        createdAt: image.createdAt || Date.now()
+      });
+      imageIds.push(image.id);
+    } catch (error) {
+      console.error('Failed to migrate image:', image.id, error);
+    }
+  }
+
+  // Update note to use imageIds instead of embedded images
+  const state = stateManager.getState();
+  const updatedNotes = (state.notes || []).map(n => {
+    if (n.id === noteId) {
+      const { images, ...restNote } = n; // Remove legacy images
+      return {
+        ...restNote,
+        imageIds,
+        modified: Date.now()
+      };
+    }
+    return n;
+  });
+
+  stateManager.save({ notes: updatedNotes });
+  await renderImageGallery();
+}
+
+/**
+ * Delete an image from the active note and IndexedDB
+ */
+async function deleteImage(imageId) {
+  const state = stateManager.getState();
+  const { activeId } = getActiveNoteState(state);
+
+  // Delete from IndexedDB
+  try {
+    await ImageStorage.deleteImage(imageId);
+  } catch (error) {
+    console.error('Failed to delete image from IndexedDB:', error);
+  }
+
+  // Update note state to remove image reference
+  const updatedNotes = (state.notes || []).map(note => {
+    if (note.id === activeId) {
+      return {
+        ...note,
+        imageIds: (note.imageIds || []).filter(id => id !== imageId),
+        // Also clean up legacy images array if present
+        images: (note.images || []).filter(img => img.id !== imageId),
+        modified: Date.now()
+      };
+    }
+    return note;
+  });
+
+  stateManager.save({ notes: updatedNotes });
+  await renderImageGallery();
+  announce('Image removed');
+}
+
+/**
+ * View image in a larger overlay
+ */
+function viewImage(dataUri) {
+  // Create overlay
+  const overlay = document.createElement('div');
+  overlay.className = 'image-view-overlay';
+  overlay.style.cssText = `
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    cursor: pointer;
+  `;
+
+  const img = document.createElement('img');
+  img.src = dataUri;
+  img.style.cssText = 'max-width: 95%; max-height: 95%; object-fit: contain;';
+
+  overlay.appendChild(img);
+  document.body.appendChild(overlay);
+
+  // Click to close
+  overlay.addEventListener('click', () => overlay.remove());
+
+  // Escape to close
+  const handleEscape = (e) => {
+    if (e.key === 'Escape') {
+      overlay.remove();
+      document.removeEventListener('keydown', handleEscape);
+    }
+  };
+  document.addEventListener('keydown', handleEscape);
+}
+
 function handleCommandMessage(message) {
   if (message.type !== 'command') {
     return;
@@ -2249,6 +3436,401 @@ function handleCommandMessage(message) {
     case 'toggle-theme-panel':
       panelManager.toggle('theme');
       break;
+  }
+}
+
+// ============================================
+// System Theme Auto-Detection
+// ============================================
+
+let systemThemeMediaQuery = null;
+
+function setupSystemThemeListener() {
+  systemThemeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+  systemThemeMediaQuery.addEventListener('change', handleSystemThemeChange);
+}
+
+function handleSystemThemeChange(event) {
+  const state = stateManager.getState();
+  if (state.theme === 'system') {
+    // Re-apply system theme to pick up the new preference
+    const effectiveTheme = ThemeManager.getSystemTheme();
+    themeManager.setTheme(effectiveTheme, { skipSave: true });
+    // Update theme chips to show system as selected
+    const allThemeClasses = ThemeManager.getAllThemeClasses();
+    allThemeClasses.push('theme-system');
+    document.querySelectorAll('.theme-chip').forEach(chip => {
+      const isSelected = chip.dataset.theme === 'system';
+      chip.classList.toggle('active', isSelected);
+    });
+  }
+}
+
+// ============================================
+// Emoji Search
+// ============================================
+
+/**
+ * Filter emoji grid by search text
+ */
+function handleEmojiSearch(event) {
+  const query = event.target.value.toLowerCase().trim();
+  const buttons = elements.emojiGrid.querySelectorAll('.emoji-btn');
+
+  buttons.forEach(btn => {
+    const emoji = btn.textContent;
+    // Simple search: match emoji itself or its unicode name hint
+    // For better results, check if the emoji is in our list with known descriptions
+    if (!query || emoji.includes(query) || matchEmojiDescription(emoji, query)) {
+      btn.style.display = '';
+    } else {
+      btn.style.display = 'none';
+    }
+  });
+}
+
+/**
+ * Match emoji by common description keywords
+ */
+function matchEmojiDescription(emoji, query) {
+  const descriptions = {
+    '😀': 'smile grin happy face',
+    '😁': 'smile grin happy',
+    '😂': 'laugh joy tears funny crying face',
+    '🤣': 'rofl laugh roll floor funny',
+    '😊': 'smile blush happy',
+    '😍': 'love heart eyes smile',
+    '🤓': 'nerd geek glasses smart',
+    '😎': 'cool sunglasses smile',
+    '🤩': 'star eyes wow amazed',
+    '🥳': 'party celebrate birthday hat',
+    '😌': 'relief relaxed sigh',
+    '🤔': 'think thinking hmm face',
+    '😴': 'sleep sleeping tired zzz',
+    '😇': 'angel halo innocent',
+    '🙌': 'praise celebrate hands raised',
+    '👏': 'clap applause hands',
+    '👍': 'thumbs up ok yes like',
+    '🔥': 'fire hot flame cool',
+    '✨': 'sparkles magic shiny stars',
+    '🌈': 'rainbow pride color',
+    '📌': 'pin pushpin marker',
+    '📝': 'memo note write pencil',
+    '✅': 'check mark todo done complete',
+    '⚡': 'lightning bolt fast energy power zap',
+    '💡': 'lightbulb idea light inspiration',
+    '📎': 'paperclip clip attach',
+    '🔖': 'bookmark tag save',
+    '📚': 'books read library study',
+    '⏰': 'alarm clock time',
+    '🎯': 'target goal bullseye aim',
+    '🧠': 'brain mind smart intelligence',
+    '💭': 'thought bubble think dream',
+    '🛠️': 'tools wrench fix build',
+    '🎶': 'music note melody song',
+    '🍀': 'clover luck lucky shamrock',
+    '🌟': 'star glowing important highlight',
+    '🚀': 'rocket launch spaceship fast deploy',
+    '🧭': 'compass navigate direction',
+    '📍': 'location pin place marker',
+    '💬': 'speech bubble chat talk comment'
+  };
+  return descriptions[emoji]?.includes(query) || false;
+}
+
+// ============================================
+// Note Search / Find
+// ============================================
+
+let noteSearchMatches = [];
+let noteSearchCurrentIndex = -1;
+
+function openNoteSearch() {
+  if (!elements.noteSearchBar || !elements.noteSearchInput) return;
+
+  elements.noteSearchBar.classList.remove('hidden');
+  elements.noteSearchInput.value = '';
+  elements.noteSearchInput.focus();
+  noteSearchMatches = [];
+  noteSearchCurrentIndex = -1;
+  updateSearchResults();
+}
+
+function closeNoteSearch() {
+  if (!elements.noteSearchBar) return;
+  elements.noteSearchBar.classList.add('hidden');
+  noteSearchMatches = [];
+  noteSearchCurrentIndex = -1;
+  // Clear any search highlights from the textarea (we use the browser's native selection)
+  elements.noteArea.focus();
+}
+
+function handleNoteSearchInput(event) {
+  const query = event.target.value;
+  if (!query) {
+    noteSearchMatches = [];
+    noteSearchCurrentIndex = -1;
+    updateSearchResults();
+    return;
+  }
+
+  // Find all matches
+  const text = elements.noteArea.value;
+  noteSearchMatches = [];
+  const lowerText = text.toLowerCase();
+  const lowerQuery = query.toLowerCase();
+  let startIndex = 0;
+
+  while (startIndex < lowerText.length) {
+    const index = lowerText.indexOf(lowerQuery, startIndex);
+    if (index === -1) break;
+    noteSearchMatches.push({ start: index, end: index + query.length });
+    startIndex = index + 1;
+  }
+
+  noteSearchCurrentIndex = noteSearchMatches.length > 0 ? 0 : -1;
+  updateSearchResults();
+
+  // Highlight first match
+  if (noteSearchMatches.length > 0) {
+    highlightSearchMatch(0);
+  }
+}
+
+function goToPrevMatch() {
+  if (noteSearchMatches.length === 0) return;
+  noteSearchCurrentIndex =
+    (noteSearchCurrentIndex - 1 + noteSearchMatches.length) % noteSearchMatches.length;
+  highlightSearchMatch(noteSearchCurrentIndex);
+}
+
+function goToNextMatch() {
+  if (noteSearchMatches.length === 0) return;
+  noteSearchCurrentIndex = (noteSearchCurrentIndex + 1) % noteSearchMatches.length;
+  highlightSearchMatch(noteSearchCurrentIndex);
+}
+
+function highlightSearchMatch(index) {
+  const match = noteSearchMatches[index];
+  if (!match) return;
+  elements.noteArea.focus();
+  elements.noteArea.setSelectionRange(match.start, match.end);
+  // Scroll the match into view (approximate by using line count)
+  const linesBefore = elements.noteArea.value.substring(0, match.start).split('\n').length;
+  const lineHeight = parseFloat(getComputedStyle(elements.noteArea).lineHeight) || 20;
+  elements.noteArea.scrollTop = Math.max(0, (linesBefore - 3) * lineHeight);
+  updateSearchResults();
+}
+
+function updateSearchResults() {
+  if (!elements.noteSearchResults) return;
+  if (noteSearchMatches.length === 0) {
+    elements.noteSearchResults.textContent =
+      elements.noteSearchInput.value ? 'No matches' : '';
+  } else {
+    elements.noteSearchResults.textContent =
+      `${noteSearchCurrentIndex + 1}/${noteSearchMatches.length}`;
+  }
+}
+
+// ============================================
+// Note Tab Context Menu (Duplicate)
+// ============================================
+
+let tabContextMenu = null;
+let tabContextMenuNoteId = null;
+
+function showTabContextMenu(event, noteId) {
+  event.preventDefault();
+  event.stopPropagation();
+
+  // Remove existing menu
+  hideTabContextMenu();
+
+  tabContextMenuNoteId = noteId;
+  tabContextMenu = document.createElement('div');
+  tabContextMenu.className = 'note-tab-context-menu';
+
+  const state = stateManager.getState();
+  const note = state.notes?.find(n => n.id === noteId);
+
+  // Pin / Unpin toggle
+  if (note) {
+    const pinBtn = document.createElement('button');
+    pinBtn.type = 'button';
+    pinBtn.innerHTML = `<i class="codicon codicon-${note.pinned ? 'unpin' : 'pin'}" aria-hidden="true"></i> ${note.pinned ? 'Unpin Note' : 'Pin Note'}`;
+    pinBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleNotePin(noteId);
+      hideTabContextMenu();
+    });
+    tabContextMenu.appendChild(pinBtn);
+  }
+
+  const duplicateBtn = document.createElement('button');
+  duplicateBtn.type = 'button';
+  duplicateBtn.innerHTML = '<i class="codicon codicon-copy" aria-hidden="true"></i> Duplicate Note';
+  duplicateBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    duplicateNote(noteId);
+    hideTabContextMenu();
+  });
+
+  tabContextMenu.appendChild(duplicateBtn);
+  document.body.appendChild(tabContextMenu);
+
+  // Position near click
+  const rect = elements.noteTabs.getBoundingClientRect();
+  tabContextMenu.style.top = `${rect.bottom + 4}px`;
+  tabContextMenu.style.left = `${Math.min(event.clientX, rect.right - 150)}px`;
+
+  // Close on outside click
+  setTimeout(() => {
+    document.addEventListener('click', hideTabContextMenu, { once: true });
+  }, 0);
+}
+
+function hideTabContextMenu() {
+  if (tabContextMenu) {
+    tabContextMenu.remove();
+    tabContextMenu = null;
+    tabContextMenuNoteId = null;
+  }
+}
+
+/**
+ * Toggle pin/unpin on a note
+ */
+function toggleNotePin(noteId) {
+  const state = stateManager.getState();
+  const updatedNotes = (state.notes || []).map(note => {
+    if (note.id === noteId) {
+      return { ...note, pinned: !note.pinned, modified: Date.now() };
+    }
+    return note;
+  });
+
+  const note = (state.notes || []).find(n => n.id === noteId);
+  const newPinned = !note?.pinned;
+  stateManager.save({ notes: updatedNotes });
+  noteTabManager.render();
+  announce(newPinned ? 'Note pinned' : 'Note unpinned');
+}
+
+/**
+ * Duplicate a note tab
+ */
+function duplicateNote(noteId) {
+  const state = stateManager.getState();
+  const note = state.notes?.find(n => n.id === noteId);
+  if (!note) return;
+
+  const now = Date.now();
+  const dupNote = {
+    ...note,
+    id: `note_${now}_${Math.random().toString(36).substr(2, 9)}`,
+    title: `${note.title} (copy)`,
+    created: now,
+    modified: now,
+    imageIds: [...(note.imageIds || [])],
+    pinned: false
+  };
+
+  const updatedNotes = [...(state.notes || []), dupNote];
+  stateManager.save({
+    notes: updatedNotes,
+    activeNoteId: dupNote.id
+  });
+
+  // Switch to duplicated note
+  elements.noteArea.value = dupNote.content;
+  updateWordCount(dupNote.content);
+  noteTabManager.render();
+  elements.noteArea.focus();
+  announce(`Duplicated "${note.title}"`);
+}
+
+// ============================================
+// Import Note from File
+// ============================================
+
+/**
+ * Trigger file picker to import a note
+ */
+function importNoteFromFile() {
+  if (!elements.importNoteInput) return;
+  elements.importNoteInput.value = '';
+  elements.importNoteInput.click();
+}
+
+async function handleImportNote(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  // Validate file size
+  if (file.size > IMPORT_LIMITS.MAX_FILE_SIZE) {
+    announce('File too large. Maximum size is 5MB.', 'assertive');
+    event.target.value = '';
+    return;
+  }
+
+  try {
+    showSaveIndicator('Importing...');
+    const text = await file.text();
+    const ext = file.name.split('.').pop()?.toLowerCase();
+
+    let content = text;
+    if (ext === 'json') {
+      // Try to parse as Hyperscribe settings export
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed.note) {
+          content = parsed.note;
+        } else if (parsed.notes && Array.isArray(parsed.notes)) {
+          // Import just the first note's content
+          content = parsed.notes[0]?.content || text;
+        }
+      } catch (e) {
+        // Not valid JSON, just use as text
+        content = text;
+      }
+    }
+
+    // Create new note tab with imported content
+    const now = Date.now();
+    const title = NotesManager.extractTitle(content) || file.name.replace(/\.[^.]+$/, '');
+    const newNote = {
+      id: `note_${now}_${Math.random().toString(36).substr(2, 9)}`,
+      title,
+      content,
+      created: now,
+      modified: now,
+      tags: [],
+      pinned: false,
+      archived: false,
+      imageIds: []
+    };
+
+    const state = stateManager.getState();
+    const updatedNotes = [...(state.notes || []), newNote];
+    stateManager.save({
+      notes: updatedNotes,
+      activeNoteId: newNote.id
+    });
+
+    elements.noteArea.value = content;
+    updateWordCount(content);
+    noteTabManager.render();
+    elements.noteArea.focus();
+
+    hideSaveIndicator({ delay: 800, message: 'Imported!' });
+    announce(`Imported "${file.name}"`);
+  } catch (error) {
+    console.error('Failed to import note:', error);
+    hideSaveIndicator({ delay: 800, message: 'Failed' });
+    announce('Failed to import file', 'assertive');
+  } finally {
+    event.target.value = '';
   }
 }
 

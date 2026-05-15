@@ -7,14 +7,13 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://microsoft.github.io/vscode-codicons/dist/codicon.css" />
-    <!-- Only load default font initially - other fonts are lazy loaded when selected -->
     <link
       href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;600&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="popup.css" />
   </head>
-  <body>
+  <body data-context="sidepanel">
     <!-- ARIA live regions for screen reader announcements -->
     <div id="ariaLivePolite" class="sr-only" aria-live="polite" aria-atomic="true"></div>
     <div id="ariaLiveAssertive" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
@@ -452,10 +451,6 @@
         aria-hidden="true"
       >
         <div class="template-panel-header">
-          <div class="template-project-row">
-            <label for="templateProjectName" class="template-project-label">Project:</label>
-            <input id="templateProjectName" type="text" class="template-project-input" placeholder="[PROJECT_NAME]" aria-label="Project name for template variables" />
-          </div>
           <button
             id="createTemplateButton"
             type="button"
@@ -493,6 +488,10 @@
               hidden
             />
           </div>
+        </div>
+        <div class="template-project-row">
+          <label for="templateProjectName" class="template-project-label">Project:</label>
+          <input id="templateProjectName" type="text" class="template-project-input" placeholder="[PROJECT_NAME]" aria-label="Project name for template variables" />
         </div>
         <div id="templateGrid" class="template-grid"></div>
       </section>
@@ -582,24 +581,6 @@
           <i class="codicon codicon-database" aria-hidden="true"></i>
         </button>
         <button
-          id="floatWindowButton"
-          type="button"
-          class="status-btn icon-only"
-          data-tooltip="Open always-on-top window"
-          aria-label="Open always-on-top window"
-        >
-          <i class="codicon codicon-pinned" aria-hidden="true"></i>
-        </button>
-        <button
-          id="openSidePanelButton"
-          type="button"
-          class="status-btn icon-only"
-          data-tooltip="Open in side panel (for dictation)"
-          aria-label="Open in side panel"
-        >
-          <i class="codicon codicon-layout-sidebar-right" aria-hidden="true"></i>
-        </button>
-        <button
           id="feedbackButton"
           type="button"
           class="status-btn icon-only"
@@ -684,7 +665,7 @@
               <input
                 id="templateIconInput"
                 type="text"
-                placeholder="📄"
+                placeholder=""
                 maxlength="2"
                 aria-label="Template icon"
               />
@@ -804,7 +785,7 @@
         <div class="context-menu-suggestions" id="spellcheckSuggestions"></div>
       </div>
 
-      <div id="resizeHandle" class="resize-handle" role="presentation" aria-hidden="true" title="Drag to resize | Double-click to reset"></div>
+      <!-- No resize handle in side panel - browser handles sizing -->
     </div>
 
     <script type="module" src="popup.js"></script>

@@ -13,8 +13,26 @@ export default class ThemeManager {
     'gruvbox-dark': { label: 'Gruvbox Dark', classes: ['theme-dark', 'theme-gruvbox-dark'] },
     'tomorrow-night': { label: 'Tomorrow Night', classes: ['theme-dark', 'theme-tomorrow-night'] },
     'one-dark': { label: 'One Dark', classes: ['theme-dark', 'theme-one-dark'] },
-    zenburn: { label: 'Zenburn', classes: ['theme-dark', 'theme-zenburn'] }
+    zenburn: { label: 'Zenburn', classes: ['theme-dark', 'theme-zenburn'] },
+    'catppuccin-latte': { label: 'Catppuccin Latte', classes: ['theme-light', 'theme-catppuccin-latte'] },
+    'catppuccin-mocha': { label: 'Catppuccin Mocha', classes: ['theme-dark', 'theme-catppuccin-mocha'] },
+    'github-light': { label: 'GitHub Light', classes: ['theme-light', 'theme-github-light'] },
+    'github-dark': { label: 'GitHub Dark', classes: ['theme-dark', 'theme-github-dark'] },
+    'tokyo-night': { label: 'Tokyo Night', classes: ['theme-dark', 'theme-tokyo-night'] },
+    'everforest-dark': { label: 'Everforest Dark', classes: ['theme-dark', 'theme-everforest-dark'] },
+    system: { label: 'System', classes: ['theme-system'] }
   };
+
+  /**
+   * Resolve the effective theme for the "system" setting.
+   * Returns 'default_bright' or 'default_dark' based on prefers-color-scheme.
+   */
+  static getSystemTheme() {
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      return 'default_dark';
+    }
+    return 'default_bright';
+  }
 
   #appElement = null;
   #themePanel = null;
@@ -53,34 +71,51 @@ export default class ThemeManager {
     }
   }
 
+  /**
+   * Get all unique theme classes from THEMES configuration.
+   * This follows the Open/Closed principle - adding a new theme
+   * doesn't require modifying this method.
+   */
+  static getAllThemeClasses() {
+    const classSet = new Set();
+    Object.values(ThemeManager.THEMES).forEach(theme => {
+      if (theme.classes) {
+        theme.classes.forEach(cls => classSet.add(cls));
+      }
+    });
+    return [...classSet];
+  }
+
   #updateUI(themeId) {
+    // Resolve system theme to actual theme
+    const effectiveTheme = themeId === 'system'
+      ? ThemeManager.getSystemTheme()
+      : themeId;
+
+    // Derive all theme classes from configuration (OCP compliant)
+    const allThemeClasses = ThemeManager.getAllThemeClasses();
+    // Include system class for cleanup
+    allThemeClasses.push('theme-system');
+
     // Remove all theme classes first
-    const allThemeClasses = [
-      'theme-light',
-      'theme-dark',
-      'theme-monokai',
-      'theme-nord',
-      'theme-dracula',
-      'theme-solarized-light',
-      'theme-solarized-dark',
-      'theme-gruvbox-light',
-      'theme-gruvbox-dark',
-      'theme-tomorrow-night',
-      'theme-one-dark',
-      'theme-zenburn'
-    ];
     this.#appElement.classList.remove(...allThemeClasses);
 
     // Apply new theme classes
-    const themeConfig = ThemeManager.THEMES[themeId];
+    const themeConfig = ThemeManager.THEMES[effectiveTheme];
     if (themeConfig && themeConfig.classes) {
       this.#appElement.classList.add(...themeConfig.classes);
+    }
+    if (themeId === 'system') {
+      this.#appElement.classList.add('theme-system');
     }
 
     // Also apply to body for full coverage
     document.body.classList.remove(...allThemeClasses);
     if (themeConfig && themeConfig.classes) {
       document.body.classList.add(...themeConfig.classes);
+    }
+    if (themeId === 'system') {
+      document.body.classList.add('theme-system');
     }
 
     // Update theme chips for accessibility and styling
@@ -92,7 +127,18 @@ export default class ThemeManager {
   }
 
   resolveThemeId(state) {
-    return state?.theme || 'default_bright';
+    const rawTheme = state?.theme || 'default_bright';
+    if (rawTheme === 'system') {
+      return ThemeManager.getSystemTheme();
+    }
+    return rawTheme;
+  }
+
+  /**
+   * Get the raw theme ID as stored (may be 'system')
+   */
+  getRawThemeId() {
+    return this.#currentTheme;
   }
 
   focusActiveChip() {
