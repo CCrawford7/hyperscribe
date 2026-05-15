@@ -100,6 +100,8 @@ body.theme-light {
   padding: 12px;
   gap: 12px;
   position: relative;
+  /* Allow scrolling when panels/content overflow the popup */
+  overflow-y: auto;
 }
 
 .theme-dark {
@@ -820,6 +822,10 @@ body.theme-light {
   flex-direction: column;
   gap: 12px;
   box-shadow: var(--shadow-light);
+  /* Prevent panels from overflowing/clipping the extension window */
+  max-height: 50vh;
+  overflow-y: auto;
+  flex-shrink: 0;
 }
 
 .theme-dark .panel {
@@ -835,6 +841,7 @@ body.theme-light {
 .panel.theme-panel {
   display: grid;
   gap: 12px;
+  max-height: 60vh;
 }
 
 .theme-panel .theme-grid {
@@ -3391,23 +3398,42 @@ body.is-resizing #noteArea {
 body[data-context="sidepanel"] {
   width: 100%;
   height: 100vh;
+  min-height: 100vh;
   overflow: hidden;
 }
 
 body[data-context="sidepanel"] #app {
   width: 100%;
-  height: 100vh;
+  height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden; /* Don't scroll — side panel fills browser, note container handles its own scroll */
+  padding: 8px;
+  gap: 8px;
+}
+
+body[data-context="sidepanel"] .toolbar {
+  flex-shrink: 0;
+}
+
+body[data-context="sidepanel"] .note-tabs {
+  flex-shrink: 0;
 }
 
 body[data-context="sidepanel"] .note-container {
   flex: 1;
-  min-height: 200px;
+  min-height: 0; /* Allow container to shrink fully */
 }
 
 body[data-context="sidepanel"] #noteArea {
   height: 100%;
+  min-height: 100px;
+  contain: layout style paint; /* Remove size containment so it fills the container */
+}
+
+/* Side panel: panel overlay positioning */
+body[data-context="sidepanel"] .panel {
+  max-height: 40vh;
 }
 
 /* Hide resize handle in side panel - browser handles sizing */

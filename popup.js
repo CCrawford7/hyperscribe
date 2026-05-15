@@ -1750,6 +1750,12 @@ function applyStateToUI(state) {
     if (elements.resizeHandle) {
       elements.resizeHandle.style.display = 'none';
     }
+  } else if (isSidePanel) {
+    // Side panel: fill available space — override the popup defaults
+    document.documentElement.style.setProperty('--popup-width', '100vw');
+    document.documentElement.style.setProperty('--popup-height', '100vh');
+    document.body.style.width = '100%';
+    document.body.style.height = '100%';
   } else if (state.windowSize) {
     // Extension popup - apply saved dimensions
     document.documentElement.style.setProperty('--popup-width', state.windowSize.width + 'px');
@@ -3098,7 +3104,22 @@ async function handleImagePaste(event) {
       event.preventDefault();
       const blob = item.getAsFile();
       if (blob) {
-        await addImageToGallery(blob);
+        const imageId = await addImageToGallery(blob);
+        // Insert a visible placeholder in the textarea at cursor position
+        if (imageId && elements.noteArea) {
+          const cursorPos = elements.noteArea.selectionStart;
+          const textBefore = elements.noteArea.value.substring(0, cursorPos);
+          const textAfter = elements.noteArea.value.substring(elements.noteArea.selectionEnd);
+          const placeholder = '[Image]';
+          const insertText = (textBefore.length > 0 && !textBefore.endsWith(' ') && !textBefore.endsWith('\n') ? ' ' : '') + placeholder;
+          elements.noteArea.value = textBefore + insertText + textAfter;
+          // Position cursor after the placeholder
+          const newPos = cursorPos + insertText.length;
+          elements.noteArea.selectionStart = newPos;
+          elements.noteArea.selectionEnd = newPos;
+          elements.noteArea.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        announce('Image pasted — see gallery below');
       }
       return;
     }
@@ -3188,9 +3209,11 @@ async function addImageToGallery(blob) {
 
     announce('Image added');
     showSaveIndicator('Saved');
+    return imageId;
   } catch (error) {
     console.error('Failed to add image:', error);
     announce('Failed to add image', 'assertive');
+    return null;
   }
 }
 
